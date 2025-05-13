@@ -43,6 +43,7 @@
 #include <fstream>
 #include <iterator>
 #include <numeric>
+#include "json_rpc_request.h"
 
 LOG_CATEGORY(SideChain)
 
@@ -668,7 +669,7 @@ bool SideChain::add_external_block(PoolBlock& block, std::vector<hash>& missing_
 				LOGINFO(0, log::LightCyan() << "Your wallet " << log::LightYellow() << w << log::LightCyan() << " didn't get a payout in block " << log::LightYellow() << data.height << log::LightCyan() << " because you had no shares in PPLNS window");
 			}
 			if (data.height > 0) {
-				const char* json_rpc_request = R"({"jsonrpc":"2.0","id":"0","method":"xmr_block","params":{"height":%u,"reward":%llu}})";
+				static const char* const json_rpc_request = R"({"jsonrpc":"2.0","id":"0","method":"xmr_block","params":{"height":%u,"reward":%llu}})";
 				char request[1024];
 				snprintf(request, sizeof(request), json_rpc_request, data.height, payout);
 

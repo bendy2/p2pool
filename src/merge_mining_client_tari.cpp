@@ -298,7 +298,7 @@ void MergeMiningClientTari::submit_solution(const BlockTemplate* block_tpl, cons
 
 						// 构建JSON-RPC请求，只发送区块高度
 						std::string json_request = R"({"jsonrpc":"2.0","id":"0","method":"tari_block","params":{"height":)" + 
-							std::to_string(block_height) + R"(,"reward":)" + std::to_string(response.reward()) + "}}";
+							std::to_string(block_height) + R"(,"reward":)" + std::to_string(response.miner_data().reward()) + "}}";
 
 						curl_easy_setopt(curl, CURLOPT_URL, "http://127.0.0.1:5000/json_rpc");
 						curl_easy_setopt(curl, CURLOPT_POSTFIELDS, json_request.c_str());
