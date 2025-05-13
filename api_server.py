@@ -27,6 +27,9 @@ logging.getLogger('urllib3').setLevel(logging.WARNING)   # requests 的日志级
 
 app = Flask(__name__)
 
+# 用户统计信息字典
+user_stats = {}
+
 # 加载配置文件
 def load_config():
     try:
