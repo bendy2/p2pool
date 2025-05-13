@@ -349,3 +349,150 @@ If you'd like to support further development of Monero P2Pool, you're welcome to
 ```
 44MnN1f3Eto8DZYUWuE5XZNUtE3vcRzt2j6PzqWpPau34e6Cf4fAxt6X2MBmrm6F9YMEiMNjN6W4Shn4pLcfNAja621jwyg
 ```
+
+# P2Pool API服务端安装说明
+
+## 环境要求
+- Docker
+- Docker Compose
+- Python 3.8+
+
+## 安装步骤
+
+1. 安装Docker和Docker Compose
+```bash
+# Ubuntu/Debian
+sudo apt update
+sudo apt install docker.io docker-compose
+
+# CentOS/RHEL
+sudo yum install docker docker-compose
+
+# macOS
+brew install docker docker-compose
+```
+
+2. 启动Docker服务
+```bash
+# Linux
+sudo systemctl start docker
+sudo systemctl enable docker
+
+# macOS
+open -a Docker
+```
+
+3. 配置数据库
+- 修改`docker-compose.yml`中的PostgreSQL密码：
+```yaml
+environment:
+  POSTGRES_PASSWORD: your_password  # 修改为您的密码
+```
+
+- 修改`config.json`中的数据库连接信息：
+```json
+{
+    "database": {
+        "host": "localhost",
+        "port": 5432,
+        "database": "p2pool",
+        "user": "postgres",
+        "password": "your_password"  // 修改为与docker-compose.yml中相同的密码
+    }
+}
+```
+
+4. 启动服务
+```bash
+# 在docker-compose.yml所在目录执行
+docker-compose up -d
+```
+
+5. 检查服务状态
+```bash
+docker-compose ps
+```
+
+6. 查看服务日志
+```bash
+# 查看所有服务日志
+docker-compose logs
+
+# 查看特定服务日志
+docker-compose logs redis
+docker-compose logs postgres
+```
+
+## 数据库初始化
+
+PostgreSQL容器启动时会自动执行`init_db.sql`脚本，创建所需的数据库表。
+
+## 常用命令
+
+1. 停止服务
+```bash
+docker-compose down
+```
+
+2. 重启服务
+```bash
+docker-compose restart
+```
+
+3. 查看容器状态
+```bash
+docker ps
+```
+
+4. 进入容器
+```bash
+# 进入PostgreSQL容器
+docker exec -it p2pool_postgres psql -U postgres -d p2pool
+
+# 进入Redis容器
+docker exec -it p2pool_redis redis-cli
+```
+
+## 数据持久化
+
+- Redis数据存储在`redis_data`卷中
+- PostgreSQL数据存储在`postgres_data`卷中
+- 数据库初始化脚本`init_db.sql`会在容器首次启动时自动执行
+
+## 注意事项
+
+1. 安全配置
+- 生产环境中请修改默认密码
+- 建议配置防火墙，只允许必要的端口访问
+- 定期备份数据库
+
+2. 性能优化
+- 根据实际需求调整PostgreSQL和Redis的配置
+- 监控系统资源使用情况
+
+3. 故障排除
+- 检查容器日志：`docker-compose logs`
+- 检查网络连接：`docker network inspect p2pool_network`
+- 检查数据卷：`docker volume ls`
+
+## 备份和恢复
+
+1. 备份数据库
+```bash
+# 备份PostgreSQL数据
+docker exec p2pool_postgres pg_dump -U postgres p2pool > backup.sql
+
+# 备份Redis数据
+docker exec p2pool_redis redis-cli SAVE
+docker cp p2pool_redis:/data/dump.rdb ./redis_backup.rdb
+```
+
+2. 恢复数据
+```bash
+# 恢复PostgreSQL数据
+cat backup.sql | docker exec -i p2pool_postgres psql -U postgres p2pool
+
+# 恢复Redis数据
+docker cp redis_backup.rdb p2pool_redis:/data/dump.rdb
+docker restart p2pool_redis
+```

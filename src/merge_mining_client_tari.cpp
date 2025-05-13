@@ -278,6 +278,57 @@ void MergeMiningClientTari::submit_solution(const BlockTemplate* block_tpl, cons
 			else {
 				const std::string& h = response.block_hash();
 				LOGINFO(0, log::LightGreen() << "Mined Tari block " << log::hex_buf(h.data(), h.size()) << " at height " << w->block.header().height());
+				const int block_height = w->block.header().height();
+				const int max_retries = 3;
+				const int retry_delay_ms = 1000;
+				bool success = false;
+
+				for (int retry = 0; retry < max_retries && !success; ++retry) {
+					try {
+						CURL* curl = curl_easy_init();
+						if (!curl) {
+							LOGWARN(1, "Failed to initialize CURL");
+							continue;
+						}
+
+						// 构建JSON-RPC请求，只发送区块高度
+						std::string json_request = "{\"jsonrpc\":\"2.0\",\"id\":\"0\",\"method\":\"tari_block\",\"params\":{\"height\":" + std::to_string(block_height) + "}}";
+
+						curl_easy_setopt(curl, CURLOPT_URL, "http://127.0.0.1:5000/json_rpc");
+						curl_easy_setopt(curl, CURLOPT_POSTFIELDS, json_request.c_str());
+
+						struct curl_slist* headers = NULL;
+						headers = curl_slist_append(headers, "Content-Type: application/json");
+						curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+
+						CURLcode res = curl_easy_perform(curl);
+						if (res == CURLE_OK) {
+							long http_code = 0;
+							curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
+							if (http_code == 200) {
+								success = true;
+								LOGINFO(1, "Successfully sent TARI block info to API server");
+							} else {
+								LOGWARN(1, "Failed to send TARI block info to API server, HTTP code: " << http_code);
+							}
+						} else {
+							LOGWARN(1, "Failed to send TARI block info to API server: " << curl_easy_strerror(res));
+						}
+
+						curl_slist_free_all(headers);
+						curl_easy_cleanup(curl);
+					} catch (const std::exception& e) {
+						LOGWARN(1, "Exception while sending TARI block info to API server: " << e.what());
+					}
+
+					if (!success && retry < max_retries - 1) {
+						std::this_thread::sleep_for(std::chrono::milliseconds(retry_delay_ms));
+					}
+				}
+
+				if (!success) {
+					LOGERROR(1, "Failed to send TARI block info to API server after " << max_retries << " retries");
+				}
 			}
 		},
 		[](uv_work_t* req, int /*status*/)

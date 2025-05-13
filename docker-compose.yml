@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7.2-alpine
+    container_name: p2pool_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    restart: unless-stopped
+    networks:
+      - p2pool_network
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: p2pool_postgres
+    environment:
+      POSTGRES_DB: p2pool
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: your_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init_db.sql:/docker-entrypoint-initdb.d/init_db.sql
+    restart: unless-stopped
+    networks:
+      - p2pool_network
+
+volumes:
+  redis_data:
+  postgres_data:
+
+networks:
+  p2pool_network:
+    driver: bridge 

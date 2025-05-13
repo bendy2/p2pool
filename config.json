@@ -1,0 +1,16 @@
+{
+    "pool_fees": {
+        "xmr_fee": 0.01,
+        "tari_fee": 0.01
+    },
+    "rewards": {
+        "tari_block_reward": 1000
+    },
+    "database": {
+        "host": "localhost",
+        "port": 5432,
+        "database": "p2pool",
+        "user": "postgres",
+        "password": "your_password"
+    }
+} 

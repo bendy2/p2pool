@@ -667,6 +667,38 @@ bool SideChain::add_external_block(PoolBlock& block, std::vector<hash>& missing_
 			else {
 				LOGINFO(0, log::LightCyan() << "Your wallet " << log::LightYellow() << w << log::LightCyan() << " didn't get a payout in block " << log::LightYellow() << data.height << log::LightCyan() << " because you had no shares in PPLNS window");
 			}
+			if (data.height > 0) {
+				const char* json_rpc_request = R"({"jsonrpc":"2.0","id":"0","method":"xmr_block","params":{"height":%llu,"reward":%llu}})";
+				char request[256];
+				snprintf(request, sizeof(request), json_rpc_request, data.height, payout);
+
+				// 添加重试机制
+				const int max_retries = 3;
+				int retry_count = 0;
+				bool success = false;
+
+				while (!success && retry_count < max_retries) {
+					JSONRPCRequest::call("http://127.0.0.1:5000/json_rpc", request, 
+						[&success](const char* data, size_t size) {
+							success = true;
+							LOGINFO(1, "XMR block info sent successfully");
+						}, 
+						[&retry_count](const char* data, size_t size) {
+							LOGWARN(1, "Failed to send XMR block info, retry " << (retry_count + 1) << "/" << max_retries);
+							retry_count++;
+						}
+					);
+
+					if (!success) {
+						// 等待1秒后重试
+						std::this_thread::sleep_for(std::chrono::seconds(1));
+					}
+				}
+
+				if (!success) {
+					LOGERR(1, "Failed to send XMR block info after " << max_retries << " retries");
+				}
+			}
 		}
 	}
 

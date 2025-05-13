@@ -25,6 +25,7 @@
 #include "p2p_server.h"
 
 #include "rapidjson_wrapper.h"
+#include <curl/curl.h>
 
 LOG_CATEGORY(StratumServer)
 
@@ -338,6 +339,7 @@ bool StratumServer::on_login(StratumClient* client, uint32_t id, const char* log
 
 bool StratumServer::on_submit(StratumClient* client, uint32_t id, const char* job_id_str, const char* nonce_str, const char* result_str)
 {
+
 	uint32_t job_id = 0;
 
 	for (size_t i = 0; job_id_str[i]; ++i) {
@@ -380,6 +382,7 @@ bool StratumServer::on_submit(StratumClient* client, uint32_t id, const char* jo
 	uint32_t extra_nonce = 0;
 	uint64_t target = 0;
 
+
 	bool found = false;
 	{
 		const StratumClient::SavedJob& saved_job = client->m_jobs[job_id % StratumClient::JOBS_SIZE];
@@ -405,6 +408,33 @@ bool StratumServer::on_submit(StratumClient* client, uint32_t id, const char* jo
 					s << "{\"id\":" << id << ",\"jsonrpc\":\"2.0\",\"error\":{\"message\":\"Stale share\"}}\n";
 					return s.m_pos;
 				});
+		}
+		// 发送用户提交信息到本地 API
+		CURL* curl = curl_easy_init();
+		if (curl) {
+			const char* username = client->m_customUser;
+			if (username[0] != '\0') {
+				// 构建JSON-RPC请求
+				char json_request[512];
+				snprintf(json_request, sizeof(json_request), 
+					"{\"jsonrpc\":\"2.0\",\"id\":\"0\",\"method\":\"submit\",\"params\":{\"username\":\"%s\"}}", 
+					username);
+				
+				curl_easy_setopt(curl, CURLOPT_URL, "http://127.0.0.1:5000/json_rpc");
+				curl_easy_setopt(curl, CURLOPT_POSTFIELDS, json_request);
+				curl_easy_setopt(curl, CURLOPT_HTTPHEADER, curl_slist_append(nullptr, "Content-Type: application/json"));
+				
+				CURLcode res = curl_easy_perform(curl);
+				if (res != CURLE_OK) {
+					LOGWARN(4, "Failed to send user submit info to local API: " << curl_easy_strerror(res));
+					// 重试一次
+					res = curl_easy_perform(curl);
+					if (res != CURLE_OK) {
+						LOGWARN(4, "Retry failed to send user submit info to local API: " << curl_easy_strerror(res));
+					}
+				}
+			}
+			curl_easy_cleanup(curl);
 		}
 
 		if (mainchain_diff.check_pow(resultHash)) {
