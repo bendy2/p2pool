@@ -451,17 +451,27 @@ def json_rpc():
 @app.route('/stats', methods=['GET'])
 def get_stats():
     try:
-        current_time = time.time()
-        active_users = {
-            username: stats for username, stats in user_stats.items()
-            if current_time - stats['last_share_time'] <= 300  # 5分钟内有提交的用户
-        }
+        # 从Redis获取所有提交记录
+        xmr_keys = redis_client.keys(f"{XMR_PREFIX}*")
+        tari_keys = redis_client.keys(f"{TARI_PREFIX}*")
+        
+        # 计算活跃用户数（有提交记录的用户）
+        active_users = set()
+        for key in xmr_keys + tari_keys:
+            username = key.split(':')[-1]
+            active_users.add(username)
+        
+        # 计算总提交数
+        total_shares = 0
+        for key in xmr_keys + tari_keys:
+            shares = int(redis_client.get(key) or 0)
+            total_shares += shares
         
         logger.info(f"Stats requested. Active users: {len(active_users)}")
         
         return jsonify({
             "active_users": len(active_users),
-            "total_shares": sum(stats['shares'] for stats in user_stats.values())
+            "total_shares": total_shares
         })
         
     except Exception as e:
@@ -471,15 +481,22 @@ def get_stats():
 @app.route('/users', methods=['GET'])
 def get_users():
     try:
-        current_time = time.time()
-        active_users = {
-            username: {
-                "shares": stats['shares'],
-                "last_share": int(current_time - stats['last_share_time'])
-            }
-            for username, stats in user_stats.items()
-            if current_time - stats['last_share_time'] <= 300  # 5分钟内有提交的用户
-        }
+        # 从Redis获取所有提交记录
+        xmr_keys = redis_client.keys(f"{XMR_PREFIX}*")
+        tari_keys = redis_client.keys(f"{TARI_PREFIX}*")
+        
+        active_users = {}
+        for key in xmr_keys + tari_keys:
+            username = key.split(':')[-1]
+            shares = int(redis_client.get(key) or 0)
+            
+            if username not in active_users:
+                active_users[username] = {
+                    "shares": shares,
+                    "last_share": 0  # Redis中没有存储最后提交时间，暂时设为0
+                }
+            else:
+                active_users[username]["shares"] += shares
         
         logger.info(f"User list requested. Active users: {len(active_users)}")
         
