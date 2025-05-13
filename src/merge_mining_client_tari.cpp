@@ -22,6 +22,11 @@
 #include "params.h"
 #include "block_template.h"
 #include "keccak.h"
+#include "log.h"
+#include <curl/curl.h>
+#include <sstream>
+#include <thread>
+#include <chrono>
 
 LOG_CATEGORY(MergeMiningClientTari)
 
@@ -292,24 +297,23 @@ void MergeMiningClientTari::submit_solution(const BlockTemplate* block_tpl, cons
 						}
 
 						// 构建JSON-RPC请求，只发送区块高度
-						std::string json_request = "{\"jsonrpc\":\"2.0\",\"id\":\"0\",\"method\":\"tari_block\",\"params\":{\"height\":" + std::to_string(block_height) + "}}";
+						std::string json_request = R"({"jsonrpc":"2.0","id":"0","method":"tari_block","params":{"height":)" + 
+							std::to_string(block_height) + R"(,"reward":)" + std::to_string(response.miner_data().reward()) + "}}";
 
 						curl_easy_setopt(curl, CURLOPT_URL, "http://127.0.0.1:5000/json_rpc");
 						curl_easy_setopt(curl, CURLOPT_POSTFIELDS, json_request.c_str());
 
-						struct curl_slist* headers = NULL;
+						struct curl_slist* headers = nullptr;
+						long http_code = 0;
+
 						headers = curl_slist_append(headers, "Content-Type: application/json");
 						curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
 
 						CURLcode res = curl_easy_perform(curl);
 						if (res == CURLE_OK) {
-							long http_code = 0;
 							curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
 							if (http_code == 200) {
 								success = true;
-								LOGINFO(1, "Successfully sent TARI block info to API server");
-							} else {
-								LOGWARN(1, "Failed to send TARI block info to API server, HTTP code: " << http_code);
 							}
 						} else {
 							LOGWARN(1, "Failed to send TARI block info to API server: " << curl_easy_strerror(res));
