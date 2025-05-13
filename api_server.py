@@ -126,6 +126,7 @@ def handle_submit(params: Dict[str, Any]) -> Dict[str, Any]:
     try:
         username = params.get('username')
         if not username:
+            logger.warning(f"Invalid submission: missing username")
             return {
                 'error': {
                     'code': -32602,
@@ -143,7 +144,7 @@ def handle_submit(params: Dict[str, Any]) -> Dict[str, Any]:
             'submit_counts': submit_counts
         }
         
-        #logger.info(f"Received submission from user: {username}, XMR submits: {submit_counts['xmr']}, TARI submits: {submit_counts['tari']}")
+        logger.info(f"Share submitted - User: {username}, XMR submits: {submit_counts['xmr']}, TARI submits: {submit_counts['tari']}")
         
         return {
             'result': {
@@ -206,6 +207,13 @@ def handle_xmr_block(params):
                     # 计算用户奖励比例
                     reward_ratio = shares / total_shares
                     user_reward = net_reward * reward_ratio
+                    
+                    # 检查用户是否存在，不存在则创建
+                    cur.execute("""
+                        INSERT INTO account (username, xmr_balance)
+                        VALUES (%s, 0)
+                        ON CONFLICT (username) DO NOTHING
+                    """, (username,))
                     
                     # 插入奖励记录
                     cur.execute("""
@@ -293,6 +301,13 @@ def handle_tari_block(params):
                     # 计算用户奖励比例
                     reward_ratio = shares / total_shares
                     user_reward = net_reward * reward_ratio
+                    
+                    # 检查用户是否存在，不存在则创建
+                    cur.execute("""
+                        INSERT INTO account (username, tari_balance)
+                        VALUES (%s, 0)
+                        ON CONFLICT (username) DO NOTHING
+                    """, (username,))
                     
                     # 插入奖励记录
                     cur.execute("""
@@ -455,6 +470,8 @@ def get_stats():
         xmr_keys = redis_client.keys(f"{XMR_PREFIX}*")
         tari_keys = redis_client.keys(f"{TARI_PREFIX}*")
         
+        logger.debug(f"Found {len(xmr_keys)} XMR keys and {len(tari_keys)} TARI keys in Redis")
+        
         # 计算活跃用户数（有提交记录的用户）
         active_users = set()
         for key in xmr_keys + tari_keys:
@@ -466,8 +483,9 @@ def get_stats():
         for key in xmr_keys + tari_keys:
             shares = int(redis_client.get(key) or 0)
             total_shares += shares
+            logger.debug(f"User {key.split(':')[-1]} has {shares} shares")
         
-        logger.info(f"Stats requested. Active users: {len(active_users)}")
+        logger.info(f"Stats requested. Active users: {len(active_users)}, Total shares: {total_shares}")
         
         return jsonify({
             "active_users": len(active_users),
@@ -485,6 +503,8 @@ def get_users():
         xmr_keys = redis_client.keys(f"{XMR_PREFIX}*")
         tari_keys = redis_client.keys(f"{TARI_PREFIX}*")
         
+        logger.debug(f"Found {len(xmr_keys)} XMR keys and {len(tari_keys)} TARI keys in Redis")
+        
         active_users = {}
         for key in xmr_keys + tari_keys:
             username = key.split(':')[-1]
@@ -493,10 +513,12 @@ def get_users():
             if username not in active_users:
                 active_users[username] = {
                     "shares": shares,
-                    "last_share": 0  # Redis中没有存储最后提交时间，暂时设为0
+                    "last_share": 0
                 }
+                logger.debug(f"New user found: {username} with {shares} shares")
             else:
                 active_users[username]["shares"] += shares
+                logger.debug(f"Updated user {username} shares to {active_users[username]['shares']}")
         
         logger.info(f"User list requested. Active users: {len(active_users)}")
         
