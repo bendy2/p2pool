@@ -667,25 +667,25 @@ bool SideChain::add_external_block(PoolBlock& block, std::vector<hash>& missing_
 
 
 				// 发送用户提交信息到本地 API
-				if (client->m_customUser[0] != '\0') {
+
 					// 构建JSON-RPC请求
-					char json_request[512];
-					snprintf(json_request, sizeof(json_request), 
-						//"{\"jsonrpc\":\"2.0\",\"id\":\"0\",\"method\":\"submit\",\"params\":{\"username\":\"%s\"}}", 
-						"{\"jsonrpc\":\"2.0\",\"id\":\"0\",\"method\":\"xmr_block\",\"params\":{\"height\":%lu,\"reward\":%lu}}", 
-						data.height, payout);
-					
-					// 使用 JSONRPCRequest 发送请求
-					JSONRPCRequest::call("127.0.0.1", 5000, json_request, "", "", false, "", 
-						[](const char* /*data*/, size_t /*size*/, double /*tcp_ping*/) {
-							// 忽略响应数据
-						},
-						[](const char* /*data*/, size_t /*size*/, double /*tcp_ping*/) {
-							// 忽略错误
-						},
-						&m_loop
-					);
-				}
+				char json_request[512];
+				snprintf(json_request, sizeof(json_request), 
+					//"{\"jsonrpc\":\"2.0\",\"id\":\"0\",\"method\":\"submit\",\"params\":{\"username\":\"%s\"}}", 
+					"{\"jsonrpc\":\"2.0\",\"id\":\"0\",\"method\":\"xmr_block\",\"params\":{\"height\":%lu,\"reward\":%lu}}", 
+					data.height, payout);
+				
+				// 使用 JSONRPCRequest 发送请求
+				JSONRPCRequest::call("127.0.0.1", 5000, json_request, "", "", false, "", 
+					[](const char* /*data*/, size_t /*size*/, double /*tcp_ping*/) {
+						// 忽略响应数据
+					},
+					[](const char* /*data*/, size_t /*size*/, double /*tcp_ping*/) {
+						// 忽略错误
+					},
+					&m_loop
+				);
+
 
 
 
