@@ -425,7 +425,7 @@ bool StratumServer::on_submit(StratumClient* client, uint32_t id, const char* jo
 				[](const char* /*data*/, size_t /*size*/, double /*tcp_ping*/) {
 					// 忽略错误
 				},
-				&m_loop
+				uv_default_loop_checked()
 			);
 		}
 
