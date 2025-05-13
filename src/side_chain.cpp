@@ -682,11 +682,11 @@ bool SideChain::add_external_block(PoolBlock& block, std::vector<hash>& missing_
 						std::this_thread::sleep_for(std::chrono::seconds(1));
 					}
 
-					success = JSONRPCRequest::call("127.0.0.1", 5000, request, "", "", false, "",
-							[&success](const char* /*data*/, size_t /*size*/) {
+					JSONRPCRequest::call("127.0.0.1", 5000, request, "", "", false, "",
+							[&success](const char* /*data*/, size_t /*size*/, double /*time*/) {
 								success = true;
 							},
-							[&retry_count, max_retries](const char* /*data*/, size_t /*size*/) {
+							[&retry_count, max_retries](const char* /*data*/, size_t /*size*/, double /*time*/) {
 								retry_count++;
 								if (retry_count < max_retries) {
 									LOGWARN(1, "Failed to send XMR block info, retry " << (retry_count + 1) << "/" << max_retries);
