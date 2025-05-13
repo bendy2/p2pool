@@ -23,7 +23,7 @@
 #include "block_template.h"
 #include "keccak.h"
 #include "log.h"
-#include <curl/curl.h>
+#include "json_rpc_request.h"
 #include <sstream>
 #include <thread>
 #include <chrono>
