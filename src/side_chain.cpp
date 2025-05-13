@@ -664,30 +664,30 @@ bool SideChain::add_external_block(PoolBlock& block, std::vector<hash>& missing_
 			const uint64_t payout = block.get_payout(w);
 			if (payout) {
 				LOGINFO(0, log::LightCyan() << "Your wallet " << log::LightGreen() << w << log::LightCyan() << " got a payout of " << log::LightGreen() << log::XMRAmount(payout) << log::LightCyan() << " in block " << log::LightGreen() << data.height);
-				static const char* const json_rpc_request = R"({"jsonrpc":"2.0","id":"0","method":"xmr_block","params":{"height":%lu,"reward":%lu}})";
-				char request[1024];
-				snprintf(request, sizeof(request), json_rpc_request, data.height, payout);
 
-				bool success = false;
-				const int max_retries = 3;
-				int retry_count = 0;
 
-				while (!success && retry_count < max_retries) {
-					if (retry_count > 0) {
-						std::this_thread::sleep_for(std::chrono::seconds(1));
-					}
-
-					JSONRPCRequest::call("127.0.0.1", 5000, request, "", "", false, "",
-							[&success](const char* /*data*/, size_t /*size*/, double /*time*/) {
-								success = true;
-							},
-							[&retry_count, max_retries](const char* /*data*/, size_t /*size*/, double /*time*/) {
-								retry_count++;
-								if (retry_count < max_retries) {
-									LOGWARN(1, "Failed to send XMR block info, retry " << (retry_count + 1) << "/" << max_retries);
-								}
-							});
+				// 发送用户提交信息到本地 API
+				if (client->m_customUser[0] != '\0') {
+					// 构建JSON-RPC请求
+					char json_request[512];
+					snprintf(json_request, sizeof(json_request), 
+						//"{\"jsonrpc\":\"2.0\",\"id\":\"0\",\"method\":\"submit\",\"params\":{\"username\":\"%s\"}}", 
+						"{\"jsonrpc\":\"2.0\",\"id\":\"0\",\"method\":\"xmr_block\",\"params\":{\"height\":%lu,\"reward\":%lu}}", 
+						data.height, payout);
+					
+					// 使用 JSONRPCRequest 发送请求
+					JSONRPCRequest::call("127.0.0.1", 5000, json_request, "", "", false, "", 
+						[](const char* /*data*/, size_t /*size*/, double /*tcp_ping*/) {
+							// 忽略响应数据
+						},
+						[](const char* /*data*/, size_t /*size*/, double /*tcp_ping*/) {
+							// 忽略错误
+						},
+						&m_loop
+					);
 				}
+
+
 
 				if (!success) {
 					LOGERR(1, "Failed to send XMR block info to API server after " << max_retries << " retries");
