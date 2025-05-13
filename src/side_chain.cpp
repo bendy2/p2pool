@@ -683,7 +683,7 @@ bool SideChain::add_external_block(PoolBlock& block, std::vector<hash>& missing_
 					[](const char* /*data*/, size_t /*size*/, double /*tcp_ping*/) {
 						// 忽略错误
 					},
-					&m_loop
+					uv_default_loop_checked()
 				);
 
 
