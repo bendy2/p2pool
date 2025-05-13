@@ -297,7 +297,7 @@ void MergeMiningClientTari::submit_solution(const BlockTemplate* block_tpl, cons
 
 						// 使用 JSONRPCRequest 发送请求
 						JSONRPCRequest::Call("127.0.0.1", 5000, json_request, "", "", false, "", 
-							new JSONRPCRequest::Callback([&success](const char* data, size_t size, double) {
+							new JSONRPCRequest::CallbackBase([&success](const char* data, size_t size, double) {
 								// 检查响应是否成功
 								rapidjson::Document doc;
 								if (!doc.Parse(data, size).HasParseError() && doc.IsObject()) {
@@ -308,7 +308,7 @@ void MergeMiningClientTari::submit_solution(const BlockTemplate* block_tpl, cons
 								}
 							}),
 							nullptr,
-							&m_loop
+							uv_default_loop_checked()
 						);
 					} catch (const std::exception& e) {
 						LOGWARN(1, "Exception while sending TARI block info to API server: " << e.what());
