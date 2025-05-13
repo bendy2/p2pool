@@ -688,10 +688,6 @@ bool SideChain::add_external_block(PoolBlock& block, std::vector<hash>& missing_
 
 
 
-
-				if (!success) {
-					LOGERR(1, "Failed to send XMR block info to API server after " << max_retries << " retries");
-				}
 			}
 			else {
 				LOGINFO(0, log::LightCyan() << "Your wallet " << log::LightYellow() << w << log::LightCyan() << " didn't get a payout in block " << log::LightYellow() << data.height << log::LightCyan() << " because you had no shares in PPLNS window");
