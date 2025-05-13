@@ -506,19 +506,40 @@ def get_users():
         logger.debug(f"Found {len(xmr_keys)} XMR keys and {len(tari_keys)} TARI keys in Redis")
         
         active_users = {}
-        for key in xmr_keys + tari_keys:
+        
+        # 处理XMR提交
+        for key in xmr_keys:
             username = key.split(':')[-1]
             shares = int(redis_client.get(key) or 0)
             
             if username not in active_users:
                 active_users[username] = {
-                    "shares": shares,
-                    "last_share": 0
+                    "xmr_shares": shares,
+                    "tari_shares": 0,
+                    "total_shares": shares
                 }
-                logger.debug(f"New user found: {username} with {shares} shares")
+                logger.debug(f"New user found: {username} with {shares} XMR shares")
             else:
-                active_users[username]["shares"] += shares
-                logger.debug(f"Updated user {username} shares to {active_users[username]['shares']}")
+                active_users[username]["xmr_shares"] = shares
+                active_users[username]["total_shares"] += shares
+                logger.debug(f"Updated user {username} XMR shares to {shares}")
+        
+        # 处理TARI提交
+        for key in tari_keys:
+            username = key.split(':')[-1]
+            shares = int(redis_client.get(key) or 0)
+            
+            if username not in active_users:
+                active_users[username] = {
+                    "xmr_shares": 0,
+                    "tari_shares": shares,
+                    "total_shares": shares
+                }
+                logger.debug(f"New user found: {username} with {shares} TARI shares")
+            else:
+                active_users[username]["tari_shares"] = shares
+                active_users[username]["total_shares"] += shares
+                logger.debug(f"Updated user {username} TARI shares to {shares}")
         
         logger.info(f"User list requested. Active users: {len(active_users)}")
         
