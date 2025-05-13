@@ -495,6 +495,99 @@ def xmr_stats():
             'error': str(e)
         }), 500
 
+def init_database():
+    """初始化数据库表结构"""
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        # 创建account表(如果不存在)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS account (
+                id SERIAL PRIMARY KEY,
+                username VARCHAR(255) UNIQUE NOT NULL,
+                xmr_balance DECIMAL(20,12) DEFAULT 0,
+                tari_balance DECIMAL(20,12) DEFAULT 0,
+                xmr_wallet VARCHAR(255),
+                tari_wallet VARCHAR(255),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        # 创建blocks表(如果不存在)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS blocks (
+                id SERIAL PRIMARY KEY,
+                block_height BIGINT UNIQUE NOT NULL,
+                rewards DECIMAL(20,12) NOT NULL,
+                type VARCHAR(10) NOT NULL,
+                total_shares BIGINT NOT NULL,
+                time TIMESTAMP NOT NULL
+            )
+        """)
+        
+        # 创建rewards表(如果不存在)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS rewards (
+                id SERIAL PRIMARY KEY,
+                block_height BIGINT NOT NULL,
+                type VARCHAR(10) NOT NULL,
+                username VARCHAR(255) NOT NULL,
+                reward DECIMAL(20,12) NOT NULL,
+                shares BIGINT NOT NULL,
+                time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (block_height) REFERENCES blocks(block_height),
+                FOREIGN KEY (username) REFERENCES account(username)
+            )
+        """)
+        
+        conn.commit()
+        logger.info("数据库表结构初始化成功")
+        
+    except Exception as e:
+        conn.rollback()
+        logger.error(f"数据库表结构初始化失败: {str(e)}")
+        raise
+    finally:
+        cur.close()
+        conn.close()
+
+def init_base_data():
+    """初始化基础数据"""
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        # 检查是否已存在基础数据
+        cur.execute("SELECT COUNT(*) FROM account")
+        count = cur.fetchone()[0]
+        
+        if count == 0:
+            # 插入基础账户数据
+            cur.execute("""
+                INSERT INTO account (username, xmr_wallet, tari_wallet)
+                VALUES 
+                ('miner1', 'XMR_WALLET_ADDRESS_1', 'TARI_WALLET_ADDRESS_1'),
+                ('miner2', 'XMR_WALLET_ADDRESS_2', 'TARI_WALLET_ADDRESS_2')
+            """)
+            
+            conn.commit()
+            logger.info("基础数据初始化成功")
+        else:
+            logger.info("基础数据已存在，跳过初始化")
+            
+    except Exception as e:
+        conn.rollback()
+        logger.error(f"基础数据初始化失败: {str(e)}")
+        raise
+    finally:
+        cur.close()
+        conn.close()
+
+# 在应用启动时初始化数据库和基础数据
+init_database()
+init_base_data()
+
 if __name__ == '__main__':
     logger.info("Starting API server...")
     app.run(host='127.0.0.1', port=5000) 
