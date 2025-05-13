@@ -7,17 +7,23 @@ from typing import Dict, Any
 import os
 import psycopg2
 from psycopg2.extras import DictCursor
+import time
 
 # 配置日志
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.WARNING,  # 将默认日志级别改为 WARNING
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('api_server.log'),
-        logging.StreamHandler()
+        logging.StreamHandler(),
+        logging.FileHandler('api_server.log')
     ]
 )
+
 logger = logging.getLogger(__name__)
+
+# 设置第三方库的日志级别
+logging.getLogger('werkzeug').setLevel(logging.WARNING)  # Flask 的日志级别
+logging.getLogger('urllib3').setLevel(logging.WARNING)   # requests 的日志级别
 
 app = Flask(__name__)
 
@@ -441,41 +447,44 @@ def json_rpc():
 
 @app.route('/stats', methods=['GET'])
 def get_stats():
-    """获取提交统计信息"""
     try:
-        # 获取所有用户的提交统计
-        xmr_stats = {}
-        tari_stats = {}
+        current_time = time.time()
+        active_users = {
+            username: stats for username, stats in user_stats.items()
+            if current_time - stats['last_share_time'] <= 300  # 5分钟内有提交的用户
+        }
         
-        # 获取所有XMR提交记录
-        xmr_keys = redis_client.keys(f"{XMR_PREFIX}*")
-        for key in xmr_keys:
-            username = key.replace(XMR_PREFIX, '')
-            count = int(redis_client.get(key) or 0)
-            xmr_stats[username] = count
-            
-        # 获取所有TARI提交记录
-        tari_keys = redis_client.keys(f"{TARI_PREFIX}*")
-        for key in tari_keys:
-            username = key.replace(TARI_PREFIX, '')
-            count = int(redis_client.get(key) or 0)
-            tari_stats[username] = count
+        logger.info(f"Stats requested. Active users: {len(active_users)}")
         
         return jsonify({
-            'xmr_stats': {
-                'total_users': len(xmr_stats),
-                'user_stats': xmr_stats
-            },
-            'tari_stats': {
-                'total_users': len(tari_stats),
-                'user_stats': tari_stats
-            }
+            "active_users": len(active_users),
+            "total_shares": sum(stats['shares'] for stats in user_stats.values())
         })
+        
     except Exception as e:
         logger.error(f"Error getting stats: {str(e)}")
-        return jsonify({
-            'error': str(e)
-        }), 500
+        return jsonify({"error": "Internal server error"}), 500
+
+@app.route('/users', methods=['GET'])
+def get_users():
+    try:
+        current_time = time.time()
+        active_users = {
+            username: {
+                "shares": stats['shares'],
+                "last_share": int(current_time - stats['last_share_time'])
+            }
+            for username, stats in user_stats.items()
+            if current_time - stats['last_share_time'] <= 300  # 5分钟内有提交的用户
+        }
+        
+        logger.info(f"User list requested. Active users: {len(active_users)}")
+        
+        return jsonify({"users": active_users})
+        
+    except Exception as e:
+        logger.error(f"Error getting user list: {str(e)}")
+        return jsonify({"error": "Internal server error"}), 500
 
 @app.route('/xmr_stats')
 def xmr_stats():
