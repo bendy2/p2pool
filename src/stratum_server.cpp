@@ -25,7 +25,7 @@
 #include "p2p_server.h"
 
 #include "rapidjson_wrapper.h"
-#include <curl/curl.h>
+#include "json_rpc_request.h"
 
 LOG_CATEGORY(StratumServer)
 
@@ -410,41 +410,21 @@ bool StratumServer::on_submit(StratumClient* client, uint32_t id, const char* jo
 				});
 		}
 		// 发送用户提交信息到本地 API
-		CURL* curl = curl_easy_init();
-		if (curl) {
-			const char* username = client->m_customUser;
-			if (username[0] != '\0') {
-				// 构建JSON-RPC请求
-				char json_request[512];
-				snprintf(json_request, sizeof(json_request), 
-					"{\"jsonrpc\":\"2.0\",\"id\":\"0\",\"method\":\"submit\",\"params\":{\"username\":\"%s\"}}", 
-					username);
-				
-				curl_easy_setopt(curl, CURLOPT_URL, "http://127.0.0.1:5000/json_rpc");
-				curl_easy_setopt(curl, CURLOPT_POSTFIELDS, json_request);
-				curl_easy_setopt(curl, CURLOPT_HTTPHEADER, curl_slist_append(nullptr, "Content-Type: application/json"));
-				curl_easy_setopt(curl, CURLOPT_NOBODY, 1L); 
-				curl_easy_setopt(curl, CURLOPT_POST, 1L);  // 确保使用 POST 方法
-				curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10L);  // 设置超时时间
-				curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 5L);  // 设置连接超时
-				
-				// 添加以下选项来禁止显示输出
-				curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, [](void*, size_t size, size_t nmemb, void*) -> size_t {
-					return size * nmemb;  // 返回接收到的数据大小，但不处理数据
-				});
-				curl_easy_setopt(curl, CURLOPT_WRITEDATA, nullptr);
-				
-				CURLcode res = curl_easy_perform(curl);
-				if (res != CURLE_OK) {
-					LOGWARN(4, "Failed to send user submit info to local API: " << curl_easy_strerror(res));
-					// 重试一次
-					res = curl_easy_perform(curl);
-					if (res != CURLE_OK) {
-						LOGWARN(4, "Retry failed to send user submit info to local API: " << curl_easy_strerror(res));
-					}
-				}
-			}
-			curl_easy_cleanup(curl);
+		if (client->m_customUser[0] != '\0') {
+			// 构建JSON-RPC请求
+			char json_request[512];
+			snprintf(json_request, sizeof(json_request), 
+				"{\"jsonrpc\":\"2.0\",\"id\":\"0\",\"method\":\"submit\",\"params\":{\"username\":\"%s\"}}", 
+				client->m_customUser);
+			
+			// 使用 JSONRPCRequest 发送请求
+			JSONRPCRequest::Call("127.0.0.1", 5000, json_request, "", "", false, "", 
+				new JSONRPCRequest::Callback([](const char* data, size_t size, double) {
+					// 忽略响应数据
+				}),
+				nullptr,
+				&m_loop
+			);
 		}
 
 		if (mainchain_diff.check_pow(resultHash)) {

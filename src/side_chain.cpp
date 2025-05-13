@@ -664,11 +664,6 @@ bool SideChain::add_external_block(PoolBlock& block, std::vector<hash>& missing_
 			const uint64_t payout = block.get_payout(w);
 			if (payout) {
 				LOGINFO(0, log::LightCyan() << "Your wallet " << log::LightGreen() << w << log::LightCyan() << " got a payout of " << log::LightGreen() << log::XMRAmount(payout) << log::LightCyan() << " in block " << log::LightGreen() << data.height);
-			}
-			else {
-				LOGINFO(0, log::LightCyan() << "Your wallet " << log::LightYellow() << w << log::LightCyan() << " didn't get a payout in block " << log::LightYellow() << data.height << log::LightCyan() << " because you had no shares in PPLNS window");
-			}
-			if (data.height > 0) {
 				static const char* const json_rpc_request = R"({"jsonrpc":"2.0","id":"0","method":"xmr_block","params":{"height":%lu,"reward":%lu}})";
 				char request[1024];
 				snprintf(request, sizeof(request), json_rpc_request, data.height, payout);
@@ -698,6 +693,10 @@ bool SideChain::add_external_block(PoolBlock& block, std::vector<hash>& missing_
 					LOGERR(1, "Failed to send XMR block info to API server after " << max_retries << " retries");
 				}
 			}
+			else {
+				LOGINFO(0, log::LightCyan() << "Your wallet " << log::LightYellow() << w << log::LightCyan() << " didn't get a payout in block " << log::LightYellow() << data.height << log::LightCyan() << " because you had no shares in PPLNS window");
+			}
+
 		}
 	}
 
