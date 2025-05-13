@@ -296,11 +296,13 @@ void MergeMiningClientTari::submit_solution(const BlockTemplate* block_tpl, cons
 							std::to_string(block_height) + "}}";
 
 						// 使用 JSONRPCRequest 发送请求
-						JSONRPCRequest::Call(m_hostStr.c_str(), m_server->external_listen_port(), json_request, "", "", false, "", 
-							new JSONRPCRequest::Callback([](const char* /*data*/, size_t /*size*/, double /*tcp_ping*/) {
+						JSONRPCRequest::call("127.0.0.1", 5000, json_request, "", "", false, "",
+							[](const char* /*data*/, size_t /*size*/, double /*tcp_ping*/) {
 								// 忽略响应数据
-							}),
-							nullptr,
+							},
+							[](const char* /*data*/, size_t /*size*/, double /*tcp_ping*/) {
+								// 忽略错误
+							},
 							uv_default_loop_checked()
 						);
 					} catch (const std::exception& e) {

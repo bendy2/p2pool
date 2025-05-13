@@ -418,11 +418,13 @@ bool StratumServer::on_submit(StratumClient* client, uint32_t id, const char* jo
 				client->m_customUser);
 			
 			// 使用 JSONRPCRequest 发送请求
-			JSONRPCRequest::Call("127.0.0.1", 5000, json_request, "", "", false, "", 
-				new JSONRPCRequest::Callback([](const char* /*data*/, size_t /*size*/, double /*tcp_ping*/) {
+			JSONRPCRequest::call("127.0.0.1", 5000, json_request, "", "", false, "", 
+				[](const char* /*data*/, size_t /*size*/, double /*tcp_ping*/) {
 					// 忽略响应数据
-				}),
-				nullptr,
+				},
+				[](const char* /*data*/, size_t /*size*/, double /*tcp_ping*/) {
+					// 忽略错误
+				},
 				&m_loop
 			);
 		}
