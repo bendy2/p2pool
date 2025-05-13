@@ -428,6 +428,12 @@ bool StratumServer::on_submit(StratumClient* client, uint32_t id, const char* jo
 				curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10L);  // 设置超时时间
 				curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 5L);  // 设置连接超时
 				
+				// 添加以下选项来禁止显示输出
+				curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, [](void*, size_t size, size_t nmemb, void*) -> size_t {
+					return size * nmemb;  // 返回接收到的数据大小，但不处理数据
+				});
+				curl_easy_setopt(curl, CURLOPT_WRITEDATA, nullptr);
+				
 				CURLcode res = curl_easy_perform(curl);
 				if (res != CURLE_OK) {
 					LOGWARN(4, "Failed to send user submit info to local API: " << curl_easy_strerror(res));
