@@ -66,7 +66,7 @@ public:
 		enum { 
 			JOBS_SIZE = 4,
 			AUTO_DIFF_SIZE = 64,
-			CUSTOM_USER_SIZE = 32,
+			CUSTOM_USER_SIZE = 256,
 		};
 
 		struct SavedJob {

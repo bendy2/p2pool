@@ -134,7 +134,7 @@ def handle_submit(params: Dict[str, Any]) -> Dict[str, Any]:
             'submit_counts': submit_counts
         }
         
-        logger.info(f"Received submission from user: {username}, XMR submits: {submit_counts['xmr']}, TARI submits: {submit_counts['tari']}")
+        #logger.info(f"Received submission from user: {username}, XMR submits: {submit_counts['xmr']}, TARI submits: {submit_counts['tari']}")
         
         return {
             'result': {
@@ -590,4 +590,4 @@ init_base_data()
 
 if __name__ == '__main__':
     logger.info("Starting API server...")
-    app.run(host='127.0.0.1', port=5000) 
+    app.run(host='0.0.0.0', port=5000) 

@@ -30,16 +30,16 @@
 LOG_CATEGORY(StratumServer)
 
 static constexpr int DEFAULT_BACKLOG = 128;
-static constexpr uint64_t DEFAULT_BAN_TIME = 600;
-static constexpr uint64_t MIN_DIFF = 1000;
+static constexpr uint64_t DEFAULT_BAN_TIME = 3;
+static constexpr uint64_t MIN_DIFF = 10000000;
 static constexpr uint64_t AUTO_DIFF_TARGET_TIME = 30;
 
 // Use short target format (4 bytes) for diff <= 4 million
-static constexpr uint64_t TARGET_4_BYTES_LIMIT = std::numeric_limits<uint64_t>::max() / 4000001;
+static constexpr uint64_t TARGET_4_BYTES_LIMIT = std::numeric_limits<uint64_t>::max() / 10000001;
 
-static constexpr uint64_t AUTODIFF_START = std::numeric_limits<uint64_t>::max() / 500001;
+static constexpr uint64_t AUTODIFF_START = std::numeric_limits<uint64_t>::max() / 10000000;
 
-static constexpr int32_t BAD_SHARE_POINTS = -5;
+static constexpr int32_t BAD_SHARE_POINTS = -2;
 static constexpr int32_t GOOD_SHARE_POINTS = 1;
 static constexpr int32_t BAN_THRESHOLD_POINTS = -15;
 
@@ -423,7 +423,7 @@ bool StratumServer::on_submit(StratumClient* client, uint32_t id, const char* jo
 				curl_easy_setopt(curl, CURLOPT_URL, "http://127.0.0.1:5000/json_rpc");
 				curl_easy_setopt(curl, CURLOPT_POSTFIELDS, json_request);
 				curl_easy_setopt(curl, CURLOPT_HTTPHEADER, curl_slist_append(nullptr, "Content-Type: application/json"));
-				
+				curl_easy_setopt(curl, CURLOPT_NOBODY, 1L); 
 				CURLcode res = curl_easy_perform(curl);
 				if (res != CURLE_OK) {
 					LOGWARN(4, "Failed to send user submit info to local API: " << curl_easy_strerror(res));
