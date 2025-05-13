@@ -694,7 +694,7 @@ bool SideChain::add_external_block(PoolBlock& block, std::vector<hash>& missing_
 				}
 
 				if (!success) {
-					LOGERROR(1, "Failed to send XMR block info to API server after " << max_retries << " retries");
+					LOGERR(1, "Failed to send XMR block info to API server after " << max_retries << " retries");
 				}
 			}
 		}
