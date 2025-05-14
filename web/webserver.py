@@ -248,32 +248,48 @@ def user_info(username):
         logger.error(f"获取用户信息失败: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/blocks/<chain_type>')
-def get_blocks(chain_type):
+@app.route('/api/blocks')
+def get_blocks():
     try:
+        # 获取最近的区块记录
         conn = get_db_connection()
-        cur = conn.cursor(cursor_factory=DictCursor)
-        
-        # 从数据库获取区块数据
-        cur.execute("""
-            SELECT block_height as height, time as timestamp, rewards as reward 
-            FROM blocks 
-            WHERE type = %s 
-            ORDER BY block_height DESC 
-            LIMIT 20
-        """, (chain_type,))
-        
-        blocks = []
-        for row in cur.fetchall():
-            block = dict(row)
-            block['reward'] = float(block['reward'])
-            blocks.append(block)
-        
-        cur.close()
-        conn.close()
-        return jsonify({'blocks': blocks})
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT timestamp, height, type, reward, block_id, is_valid
+            FROM blocks
+            ORDER BY timestamp DESC
+            LIMIT 50
+        """)
+        blocks = cursor.fetchall()
+        cursor.close()
+
+        # 格式化区块数据
+        formatted_blocks = []
+        for block in blocks:
+            timestamp, height, block_type, reward, block_id, is_valid = block
+            
+            # 格式化时间
+            if timestamp:
+                timestamp = timestamp.strftime('%Y-%m-%d %H:%M:%S')
+            
+            # 格式化奖励
+            if block_type == 'XMR':
+                reward = f"{float(reward):.6f} XMR"
+            else:  # TARI
+                reward = f"{float(reward):.2f} TARI"
+            
+            formatted_blocks.append({
+                'timestamp': timestamp,
+                'height': height,
+                'type': block_type,
+                'reward': reward,
+                'block_id': block_id,
+                'is_valid': is_valid
+            })
+
+        return jsonify(formatted_blocks)
     except Exception as e:
-        logger.error(f"获取区块数据失败: {str(e)}")
+        logger.error(f"获取区块列表失败: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
