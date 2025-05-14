@@ -8,16 +8,14 @@ function formatTime(timestamp) {
     if (!timestamp) return '未知时间';
     
     try {
-        // 确保timestamp是数字
-        const ts = parseInt(timestamp);
-        if (isNaN(ts)) return '无效时间';
-        
-        const date = new Date(ts * 1000);
-        // 转换为北京时间（UTC+8）
-        const beijingTime = new Date(date.getTime() + 8 * 60 * 60 * 1000);
+        // 直接解析GMT时间字符串
+        const date = new Date(timestamp);
         
         // 检查日期是否有效
-        if (isNaN(beijingTime.getTime())) return '无效时间';
+        if (isNaN(date.getTime())) return '无效时间';
+        
+        // 转换为北京时间（UTC+8）
+        const beijingTime = new Date(date.getTime() + 8 * 60 * 60 * 1000);
         
         return beijingTime.toLocaleString('zh-CN', {
             year: 'numeric',
