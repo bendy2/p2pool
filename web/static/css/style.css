@@ -84,7 +84,7 @@ body {
 }
 
 .block-tari {
-    background-color: rgba(13, 110, 253, 0.1);
+    background-color: rgba(220, 53, 69, 0.1);
 }
 
 /* 区块类型标签 */
@@ -93,6 +93,7 @@ body {
     border-radius: 4px;
     font-size: 0.875rem;
     font-weight: 500;
+    text-transform: uppercase;
 }
 
 .block-type-xmr {
@@ -101,6 +102,6 @@ body {
 }
 
 .block-type-tari {
-    background-color: #0d6efd;
+    background-color: #dc3545;
     color: #fff;
 } 
