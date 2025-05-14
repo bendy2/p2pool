@@ -65,7 +65,9 @@ function updateBlocks() {
             
             data.forEach(block => {
                 const row = document.createElement('tr');
-                row.className = block.type === 'XMR' ? 'block-xmr' : 'block-tari';
+                // 修改类型判断为小写
+                const blockType = block.type.toLowerCase();
+                row.className = blockType === 'xmr' ? 'block-xmr' : 'block-tari';
                 
                 // 转换为北京时间
                 const time = new Date(block.timestamp);
@@ -80,13 +82,14 @@ function updateBlocks() {
                     hour12: false
                 });
                 
-                const typeClass = block.type === 'XMR' ? 'block-type-xmr' : 'block-type-tari';
+                // 修改类型类名判断为小写
+                const typeClass = blockType === 'xmr' ? 'block-type-xmr' : 'block-type-tari';
                 const statusClass = block.is_valid ? 'status-valid' : 'status-invalid';
                 const statusText = block.is_valid ? '有效' : '无效';
                 
                 // 修改奖励显示
                 let reward = block.reward;
-                if (block.type === 'XMR') {
+                if (blockType === 'xmr') {
                     // 提取数字部分并格式化为6位小数
                     const amount = parseFloat(reward);
                     reward = `${amount.toFixed(6)} XMR`;
@@ -99,7 +102,7 @@ function updateBlocks() {
                     <td>${formattedTime}</td>
                     <td>${block.height}</td>
                     <td><span class="block-id">${block.block_id || '-'}</span></td>
-                    <td><span class="block-type ${typeClass}">${block.type}</span></td>
+                    <td><span class="block-type ${typeClass}">${block.type.toUpperCase()}</span></td>
                     <td>${reward}</td>
                     <td><span class="block-status ${statusClass}">${statusText}</span></td>
                 `;
