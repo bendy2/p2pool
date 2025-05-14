@@ -47,7 +47,7 @@ def get_db_connection():
 
 def read_stratum_data():
     try:
-        with open('../stratum', 'r') as f:
+        with open('.api/local/stratum', 'r') as f:
             data = json.load(f)
             return {
                 'hashrate_15m': data.get('hashrate_15m', 0),
@@ -220,7 +220,6 @@ def get_blocks(chain_type):
         blocks = []
         for row in cur.fetchall():
             block = dict(row)
-            # 将Decimal类型转换为float
             block['reward'] = float(block['reward'])
             blocks.append(block)
         

@@ -5,28 +5,43 @@ function formatNumber(num) {
 
 // 格式化时间（北京时间）
 function formatTime(timestamp) {
-    const date = new Date(timestamp * 1000);
-    // 转换为北京时间（UTC+8）
-    const beijingTime = new Date(date.getTime() + 8 * 60 * 60 * 1000);
-    return beijingTime.toLocaleString('zh-CN', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: false
-    });
+    if (!timestamp) return '未知时间';
+    
+    try {
+        // 确保timestamp是数字
+        const ts = parseInt(timestamp);
+        if (isNaN(ts)) return '无效时间';
+        
+        const date = new Date(ts * 1000);
+        // 转换为北京时间（UTC+8）
+        const beijingTime = new Date(date.getTime() + 8 * 60 * 60 * 1000);
+        
+        // 检查日期是否有效
+        if (isNaN(beijingTime.getTime())) return '无效时间';
+        
+        return beijingTime.toLocaleString('zh-CN', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false
+        });
+    } catch (error) {
+        console.error('时间格式化错误:', error);
+        return '时间错误';
+    }
 }
 
 // 格式化XMR金额
 function formatXMR(amount) {
-    return (amount / 1e12).toFixed(12) + ' XMR';
+    return amount.toFixed(6) + ' XMR';
 }
 
 // 格式化TARI金额
 function formatTARI(amount) {
-    return (amount / 1e6).toFixed(6) + ' TARI';
+    return amount.toFixed(2) + ' TARI';
 }
 
 // 格式化算力
