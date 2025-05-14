@@ -3,6 +3,7 @@ import psycopg2
 from psycopg2.extras import DictCursor
 import logging
 import json
+import sys
 from datetime import datetime
 
 # 配置日志
@@ -14,21 +15,42 @@ logger = logging.getLogger(__name__)
 
 def load_config():
     try:
-        with open('config.json', 'r') as f:
-            return json.load(f)
+        # 尝试多个可能的配置文件路径
+        config_paths = [
+            'config.json',
+            '../config.json',
+            './config.json'
+        ]
+        
+        for path in config_paths:
+            try:
+                with open(path, 'r') as f:
+                    return json.load(f)
+            except FileNotFoundError:
+                continue
+                
+        raise FileNotFoundError("未找到配置文件")
     except Exception as e:
         logger.error(f"加载配置文件失败: {str(e)}")
         raise
 
 def get_db_connection():
     config = load_config()
-    return psycopg2.connect(
-        host=config['database']['host'],
-        port=config['database']['port'],
-        database=config['database']['database'],
-        user=config['database']['user'],
-        password=config['database']['password']
-    )
+    try:
+        conn = psycopg2.connect(
+            host=config['database']['host'],
+            port=config['database']['port'],
+            database=config['database']['database'],
+            user=config['database']['user'],
+            password=config['database']['password']
+        )
+        # 测试连接
+        with conn.cursor() as cur:
+            cur.execute("SELECT 1")
+        return conn
+    except Exception as e:
+        logger.error(f"数据库连接失败: {str(e)}")
+        raise
 
 def mark_block_invalid(block_id):
     try:
