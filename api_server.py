@@ -834,7 +834,7 @@ class TariBlockChecker(threading.Thread):
     def get_block_from_api(self, height):
         """从 API 获取区块数据"""
         try:
-            url = f'https://textexplore.tari.com/blocks/{block_height}?json'
+            url = f'https://textexplore.tari.com/blocks/{height}?json'
             response = requests.get(url, timeout=10)
             response.raise_for_status()
             
