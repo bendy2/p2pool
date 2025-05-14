@@ -67,7 +67,6 @@ def update_blocks_check_status():
             
             logger.info(f"更新完成：")
             logger.info(f"- XMR区块：{xmr_count} 个已设置为已检查")
-            logger.info(f"- TARI区块：{tari_count} 个已设置为待检查")
             
             return True
             
