@@ -1,0 +1,53 @@
+syntax = "proto3";
+
+package tari.rpc;
+
+// Wallet service definition
+service Wallet {
+    // GetCompletedTransactions returns a stream of completed transactions
+    rpc GetCompletedTransactions(GetCompletedTransactionsRequest) returns (stream GetCompletedTransactionsResponse) {}
+}
+
+// Request message for GetCompletedTransactions
+message GetCompletedTransactionsRequest {
+    // Optional filter for transaction status
+    optional TransactionStatus status = 1;
+}
+
+// Response message for GetCompletedTransactions
+message GetCompletedTransactionsResponse {
+    // The transaction details
+    Transaction transaction = 1;
+}
+
+// Transaction message
+message Transaction {
+    // Transaction ID
+    string tx_id = 1;
+    // Source address
+    string source_address = 2;
+    // Destination address
+    string destination_address = 3;
+    // Amount
+    uint64 amount = 4;
+    // Fee
+    uint64 fee = 5;
+    // Status
+    TransactionStatus status = 6;
+    // Timestamp
+    uint64 timestamp = 7;
+    // Message
+    string message = 8;
+}
+
+// Transaction status enum
+enum TransactionStatus {
+    // Unknown status
+    UNKNOWN = 0;
+    // Transaction is completed
+    COMPLETED = 1;
+    // Transaction is pending
+    PENDING = 2;
+    // Transaction failed
+    FAILED = 3;
+} 
