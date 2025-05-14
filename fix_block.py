@@ -75,8 +75,7 @@ def fix_block():
                 # 4. 更新用户余额
                 cursor.execute("""
                     UPDATE account
-                    SET tari_balance = tari_balance - %s + %s,
-                        updated_at = CURRENT_TIMESTAMP
+                    SET tari_balance = tari_balance - %s + %s
                     WHERE username = %s
                 """, (old_reward, new_reward, reward['username']))
             
