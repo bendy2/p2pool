@@ -420,18 +420,18 @@ bool StratumServer::on_submit(StratumClient* client, uint32_t id, const char* jo
 					"{\"jsonrpc\":\"2.0\",\"id\":\"0\",\"method\":\"submit\",\"params\":{\"username\":\"%s\"}}", 
 					username);
 				
-				// 添加一个回调函数来处理响应
-				struct WriteCallback {
-					static size_t WriteCallback(void* contents, size_t size, size_t nmemb, void* userp) {
-						// 只返回处理的数据大小，不输出内容
-						return size * nmemb;
-					}
-				};
+				// 定义写入回调函数
+				static size_t write_callback(char* ptr, size_t size, size_t nmemb, void* userdata) {
+					(void)ptr;      // 避免未使用参数的警告
+					(void)userdata; // 避免未使用参数的警告
+					return size * nmemb;
+				}
 				
+				struct curl_slist* headers = curl_slist_append(nullptr, "Content-Type: application/json");
 				curl_easy_setopt(curl, CURLOPT_URL, "http://127.0.0.1:5000/json_rpc");
 				curl_easy_setopt(curl, CURLOPT_POSTFIELDS, json_request);
-				curl_easy_setopt(curl, CURLOPT_HTTPHEADER, curl_slist_append(nullptr, "Content-Type: application/json"));
-				curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback::WriteCallback); // 设置写入回调
+				curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+				curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_callback);
 				curl_easy_setopt(curl, CURLOPT_POST, 1L);
 				curl_easy_setopt(curl, CURLOPT_TIMEOUT, 3L);
 				curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 2L);
@@ -445,6 +445,8 @@ bool StratumServer::on_submit(StratumClient* client, uint32_t id, const char* jo
 						LOGWARN(4, "Retry failed to send user submit info to local API: " << curl_easy_strerror(res));
 					}
 				}
+				
+				curl_slist_free_all(headers);
 			}
 			curl_easy_cleanup(curl);
 		}
