@@ -127,6 +127,17 @@ def user_search():
 def user_page(username):
     return render_template('user.html', username=username)
 
+def format_username(username):
+    """格式化用户名显示"""
+    if len(username) <= 20:
+        # 长度不足20位，显示前4位（不足补*）加4个*
+        prefix = username[:4].ljust(4, '*')
+        return f"{prefix}****"
+    else:
+        # 长度超过20位，显示4个*加后4位
+        suffix = username[-4:]
+        return f"****{suffix}"
+
 @app.route('/api/pool_status')
 def pool_status():
     try:
@@ -161,19 +172,35 @@ def pool_status():
         
         # 获取在线矿工列表
         online_miners = []
+        miner_hashrates = {}  # 用于合并同一用户的算力
+        
         for worker in stratum_data['workers']:
             try:
                 parts = worker.split(',')
                 if len(parts) >= 5:
                     username = parts[4]
                     hashrate = float(parts[1])
-                    if username not in [m['username'] for m in online_miners]:
-                        online_miners.append({
-                            'username': username,
-                            'hashrate': hashrate
-                        })
+                    
+                    # 合并同一用户的算力
+                    if username in miner_hashrates:
+                        miner_hashrates[username] += hashrate
+                    else:
+                        miner_hashrates[username] = hashrate
             except:
                 continue
+        
+        # 转换为列表并格式化用户名
+        online_miners = [
+            {
+                'username': format_username(username),
+                'hashrate': hashrate
+            }
+            for username, hashrate in miner_hashrates.items()
+        ]
+        
+        # 按算力排序并只取前20名
+        online_miners.sort(key=lambda x: x['hashrate'], reverse=True)
+        online_miners = online_miners[:20]
 
         return jsonify({
             'hashrate_15m': stratum_data['hashrate_15m'],
