@@ -1169,6 +1169,10 @@ void StratumServer::on_shutdown()
 		MutexLock lock(m_showWorkersLock);
 		uv_close(reinterpret_cast<uv_handle_t*>(&m_showWorkersAsync), nullptr);
 	}
+	if (m_loop.data) {
+        uv_loop_close(&m_loop);
+        m_loop.data = nullptr;
+    }
 }
 
 StratumServer::StratumClient::StratumClient()
@@ -1602,13 +1606,6 @@ void StratumServer::api_update_local_stats(uint64_t timestamp)
 			s	<< "]}";
 		});
 	});
-}
-
-void StratumServer::shutdown() {
-    if (m_loop.data) {
-        uv_loop_close(&m_loop);
-        m_loop.data = nullptr;
-    }
 }
 
 } // namespace p2pool
