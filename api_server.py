@@ -483,10 +483,10 @@ def json_rpc():
         # 根据方法名调用相应的处理函数
         if method == 'submit':
             result = handle_submit(params)
-        elif method == 'xmr_block':
-            result = handle_xmr_block(params)
-        elif method == 'tari_block':
-            result = handle_tari_block(params)
+        #elif method == 'xmr_block':
+        #    #result = handle_xmr_block(params)
+        #elif method == 'tari_block':
+        #    #result = handle_tari_block(params)
         else:
             return jsonify({
                 'jsonrpc': '2.0',
