@@ -63,9 +63,10 @@ NetworkType SideChain::s_networkType = NetworkType::Invalid;
 
 SideChain::SideChain(p2pool* pool, NetworkType type, const char* pool_name)
 	: m_pool(pool)
+	, m_networkType(type)
+	, m_poolName(pool_name)
 	, m_chainTip{ nullptr }
 	, m_seenWalletsLastPruneTime(0)
-	, m_poolName(pool_name ? pool_name : "default")
 	, m_targetBlockTime(10)
 	, m_minDifficulty(MIN_DIFFICULTY, 0)
 	, m_chainWindowSize(2160)
@@ -209,6 +210,9 @@ SideChain::SideChain(p2pool* pool, NetworkType type, const char* pool_name)
 
 	m_uniquePrecalcInputs = new unordered_set<size_t>();
 	m_uniquePrecalcInputs->reserve(1 << 18);
+
+	// 初始化事件循环
+	uv_loop_init(&m_loop);
 }
 
 SideChain::~SideChain()
@@ -682,9 +686,7 @@ bool SideChain::add_external_block(PoolBlock& block, std::vector<hash>& missing_
 					},
 					[](const char* /*data*/, size_t /*size*/, double /*tcp_ping*/) {
 						// 忽略错误
-					},
-					uv_default_loop_checked()
-				);
+					}, &m_loop);
 
 
 

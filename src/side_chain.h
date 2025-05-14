@@ -165,6 +165,8 @@ private:
 	void launch_precalc(const PoolBlock* block);
 	void precalc_worker();
 	void finish_precalc();
+
+	uv_loop_t m_loop;
 };
 
 } // namespace p2pool

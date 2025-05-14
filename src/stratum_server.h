@@ -213,6 +213,8 @@ private:
 	void api_update_local_stats(uint64_t timestamp);
 
 	void on_shutdown() override;
+
+	uv_loop_t m_loop;
 };
 
 } // namespace p2pool

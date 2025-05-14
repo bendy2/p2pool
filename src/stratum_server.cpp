@@ -62,6 +62,9 @@ StratumServer::StratumServer(p2pool* pool)
 	, m_totalStratumShares(0)
 	, m_apiLastUpdateTime(0)
 {
+	// 初始化事件循环
+	uv_loop_init(&m_loop);
+
 	// Need a bigger buffer for the TLS handshake
 	m_callbackBuf.resize(STRATUM_CALLBACK_BUF_SIZE);
 
@@ -424,9 +427,7 @@ bool StratumServer::on_submit(StratumClient* client, uint32_t id, const char* jo
 				},
 				[](const char* /*data*/, size_t /*size*/, double /*tcp_ping*/) {
 					// 忽略错误
-				},
-				uv_default_loop_checked()
-			);
+				}, &m_loop);
 		}
 
 		if (mainchain_diff.check_pow(resultHash)) {
