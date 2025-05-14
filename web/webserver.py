@@ -1,20 +1,49 @@
 from flask import Flask, render_template, jsonify, request, redirect, url_for
 import redis
-import sqlite3
+import psycopg2
+from psycopg2.extras import DictCursor
 from datetime import datetime
 import json
 import os
+import logging
+
+# 配置日志
+logging.basicConfig(
+    level=logging.WARNING,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler('web_server.log')
+    ]
+)
+
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
 # Redis连接配置
-redis_client = redis.Redis(host='localhost', port=6379, db=0)
+redis_client = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
+
+# 加载配置文件
+def load_config():
+    try:
+        with open('config.json', 'r') as f:
+            return json.load(f)
+    except Exception as e:
+        logger.error(f"加载配置文件失败: {str(e)}")
+        raise
+
+config = load_config()
 
 # 数据库连接配置
 def get_db_connection():
-    conn = sqlite3.connect('pool_data.db')
-    conn.row_factory = sqlite3.Row
-    return conn
+    return psycopg2.connect(
+        host=config['database']['host'],
+        port=config['database']['port'],
+        database=config['database']['database'],
+        user=config['database']['user'],
+        password=config['database']['password']
+    )
 
 def read_stratum_data():
     try:
@@ -27,7 +56,7 @@ def read_stratum_data():
                 'workers': data.get('workers', [])
             }
     except Exception as e:
-        print(f"读取stratum数据失败: {str(e)}")
+        logger.error(f"读取stratum数据失败: {str(e)}")
         return {
             'hashrate_15m': 0,
             'hashrate_1h': 0,
@@ -68,9 +97,31 @@ def user_page(username):
 @app.route('/api/pool_status')
 def pool_status():
     try:
-        # 从Redis获取实时数据
-        active_miners = redis_client.get('pool:active_miners') or 0
-        total_rewards = redis_client.get('pool:total_rewards') or 0
+        # 从Redis获取XMR链的活跃矿工数量
+        active_miners = redis_client.scard('xmr:active_miners') or 0
+
+        # 从数据库获取总奖励
+        conn = get_db_connection()
+        cur = conn.cursor(cursor_factory=DictCursor)
+        
+        # 获取XMR总奖励
+        cur.execute("""
+            SELECT COALESCE(SUM(reward), 0) as total
+            FROM blocks 
+            WHERE type = 'xmr'
+        """)
+        total_rewards_xmr = cur.fetchone()['total'] or 0
+
+        # 获取TARI总奖励
+        cur.execute("""
+            SELECT COALESCE(SUM(reward), 0) as total
+            FROM blocks 
+            WHERE type = 'tari'
+        """)
+        total_rewards_tari = cur.fetchone()['total'] or 0
+
+        cur.close()
+        conn.close()
 
         # 从stratum文件读取算力数据
         stratum_data = read_stratum_data()
@@ -80,47 +131,53 @@ def pool_status():
             'hashrate_1h': stratum_data['hashrate_1h'],
             'hashrate_24h': stratum_data['hashrate_24h'],
             'active_miners': int(active_miners),
-            'total_rewards': float(total_rewards)
+            'total_rewards_xmr': float(total_rewards_xmr),
+            'total_rewards_tari': float(total_rewards_tari)
         })
     except Exception as e:
+        logger.error(f"获取矿池状态失败: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/user/<username>')
 def user_info(username):
     try:
         conn = get_db_connection()
-        cursor = conn.cursor()
+        cur = conn.cursor(cursor_factory=DictCursor)
         
         # 获取用户账户信息
-        cursor.execute('SELECT * FROM account WHERE username = ?', (username,))
-        account = cursor.fetchone()
+        cur.execute("""
+            SELECT * FROM users 
+            WHERE username = %s
+        """, (username,))
+        account = cur.fetchone()
         
         if not account:
             return jsonify({'error': '用户不存在'}), 404
         
         # 获取用户奖励历史
-        cursor.execute('''
-            SELECT timestamp, height, amount 
-            FROM reward 
-            WHERE username = ? 
+        cur.execute("""
+            SELECT timestamp, block_height as height, reward as amount 
+            FROM blocks 
+            WHERE username = %s 
             ORDER BY timestamp DESC 
             LIMIT 20
-        ''', (username,))
-        rewards = [dict(row) for row in cursor.fetchall()]
+        """, (username,))
+        rewards = [dict(row) for row in cur.fetchall()]
         
         # 获取用户支付历史
-        cursor.execute('''
+        cur.execute("""
             SELECT timestamp, txid, amount, status 
-            FROM payment 
-            WHERE username = ? 
+            FROM payments 
+            WHERE username = %s 
             ORDER BY timestamp DESC 
             LIMIT 20
-        ''', (username,))
-        payments = [dict(row) for row in cursor.fetchall()]
+        """, (username,))
+        payments = [dict(row) for row in cur.fetchall()]
         
         # 获取用户当前算力
         current_hashrate = get_user_hashrate(username)
         
+        cur.close()
         conn.close()
         
         return jsonify({
@@ -132,34 +189,31 @@ def user_info(username):
             'payments': payments
         })
     except Exception as e:
+        logger.error(f"获取用户信息失败: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/blocks/<chain_type>')
 def get_blocks(chain_type):
     try:
         conn = get_db_connection()
-        cursor = conn.cursor()
+        cur = conn.cursor(cursor_factory=DictCursor)
         
         # 从数据库获取区块数据
-        cursor.execute('''
-            SELECT height, timestamp, reward 
+        cur.execute("""
+            SELECT block_height as height, timestamp, reward 
             FROM blocks 
-            WHERE chain_type = ? 
-            ORDER BY height DESC 
+            WHERE type = %s 
+            ORDER BY block_height DESC 
             LIMIT 20
-        ''', (chain_type,))
+        """, (chain_type,))
         
-        blocks = []
-        for row in cursor.fetchall():
-            blocks.append({
-                'height': row['height'],
-                'timestamp': row['timestamp'],
-                'reward': row['reward']
-            })
+        blocks = [dict(row) for row in cur.fetchall()]
         
+        cur.close()
         conn.close()
         return jsonify({'blocks': blocks})
     except Exception as e:
+        logger.error(f"获取区块数据失败: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':

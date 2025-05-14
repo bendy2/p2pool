@@ -24,6 +24,11 @@ function formatXMR(amount) {
     return (amount / 1e12).toFixed(12) + ' XMR';
 }
 
+// 格式化TARI金额
+function formatTARI(amount) {
+    return (amount / 1e6).toFixed(6) + ' TARI';
+}
+
 // 格式化算力
 function formatHashrate(hashrate) {
     if (hashrate >= 1e9) {
@@ -52,7 +57,8 @@ async function updatePoolStatus() {
         document.getElementById('hashrate-1h').textContent = formatHashrate(data.hashrate_1h);
         document.getElementById('hashrate-24h').textContent = formatHashrate(data.hashrate_24h);
         document.getElementById('active-miners').textContent = formatNumber(data.active_miners);
-        document.getElementById('total-rewards').textContent = formatXMR(data.total_rewards);
+        document.getElementById('total-rewards-xmr').textContent = formatXMR(data.total_rewards_xmr);
+        document.getElementById('total-rewards-tari').textContent = formatTARI(data.total_rewards_tari);
     } catch (error) {
         console.error('获取矿池状态失败:', error);
     }
@@ -77,7 +83,7 @@ async function updateBlocks(type) {
             tr.innerHTML = `
                 <td>${formatNumber(block.height)}</td>
                 <td>${formatTime(block.timestamp)}</td>
-                <td>${formatXMR(block.reward)}</td>
+                <td>${type === 'xmr' ? formatXMR(block.reward) : formatTARI(block.reward)}</td>
             `;
             tbody.appendChild(tr);
         });
