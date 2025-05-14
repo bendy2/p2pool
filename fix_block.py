@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
-import sqlite3
+import psycopg2
+from psycopg2.extras import DictCursor
 import logging
+import json
 from datetime import datetime
 
 # 配置日志
@@ -10,20 +12,38 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+def load_config():
+    try:
+        with open('config.json', 'r') as f:
+            return json.load(f)
+    except Exception as e:
+        logger.error(f"加载配置文件失败: {str(e)}")
+        raise
+
+def get_db_connection():
+    config = load_config()
+    return psycopg2.connect(
+        host=config['database']['host'],
+        port=config['database']['port'],
+        database=config['database']['database'],
+        user=config['database']['user'],
+        password=config['database']['password']
+    )
+
 def fix_block():
     try:
-        conn = sqlite3.connect('p2pool.db')
-        cursor = conn.cursor()
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=DictCursor)
         
         # 开始事务
-        cursor.execute("BEGIN TRANSACTION")
+        cursor.execute("BEGIN")
         
         try:
             # 1. 更新区块奖励
             cursor.execute("""
                 UPDATE blocks
-                SET reward = 13850
-                WHERE height = 6379 AND type = 'TARI'
+                SET rewards = 13850
+                WHERE block_height = 6379 AND type = 'tari'
             """)
             
             if cursor.rowcount == 0:
@@ -34,29 +54,30 @@ def fix_block():
             cursor.execute("""
                 SELECT username, reward
                 FROM rewards
-                WHERE block_height = 6379 AND type = 'TARI'
+                WHERE block_height = 6379 AND type = 'tari'
             """)
             
             rewards = cursor.fetchall()
             logger.info(f"找到 {len(rewards)} 条奖励记录")
             
             # 3. 更新奖励记录
-            for username, old_reward in rewards:
+            for reward in rewards:
+                old_reward = float(reward['reward'])
                 new_reward = old_reward * 13.85
                 cursor.execute("""
                     UPDATE rewards
-                    SET reward = ?
+                    SET reward = %s
                     WHERE block_height = 6379 
-                    AND type = 'TARI'
-                    AND username = ?
-                """, (new_reward, username))
+                    AND type = 'tari'
+                    AND username = %s
+                """, (new_reward, reward['username']))
                 
                 # 4. 更新用户余额
                 cursor.execute("""
-                    UPDATE users
-                    SET tari_balance = tari_balance - ? + ?
-                    WHERE username = ?
-                """, (old_reward, new_reward, username))
+                    UPDATE account
+                    SET tari_balance = tari_balance - %s + %s
+                    WHERE username = %s
+                """, (old_reward, new_reward, reward['username']))
             
             # 5. 记录操作日志
             cursor.execute("""
@@ -65,7 +86,7 @@ def fix_block():
                     operation_type,
                     operation_time,
                     details
-                ) VALUES (?, ?, ?, ?)
+                ) VALUES (%s, %s, %s, %s)
             """, (
                 'TARI-6379',
                 'FIX_REWARD',
