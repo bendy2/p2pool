@@ -79,6 +79,39 @@ def get_user_hashrate(username):
     
     return total_hashrate
 
+# 缓存活跃矿工数
+def get_active_miners():
+    # 尝试从缓存获取
+    cached_count = redis_client.get('cached:active_miners')
+    if cached_count is not None:
+        return int(cached_count)
+    
+    try:
+        # 从stratum文件读取数据
+        with open('./api/local/stratum', 'r') as f:
+            data = json.load(f)
+            workers = data.get('workers', [])
+            
+            # 统计不同IP的矿工数
+            unique_ips = set()
+            for worker in workers:
+                try:
+                    # 解析worker数据: "IP:PORT,HASHRATE,SHARES,DIFFICULTY,USERNAME"
+                    parts = worker.split(',')
+                    if len(parts) >= 5:
+                        ip = parts[0].split(':')[0]  # 只取IP部分
+                        unique_ips.add(ip)
+                except:
+                    continue
+            
+            # 更新缓存，设置10秒过期
+            count = len(unique_ips)
+            redis_client.setex('cached:active_miners', 10, count)
+            return count
+    except Exception as e:
+        logger.error(f"统计活跃矿工数失败: {str(e)}")
+        return 0
+
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -97,8 +130,8 @@ def user_page(username):
 @app.route('/api/pool_status')
 def pool_status():
     try:
-        # 从Redis获取XMR链的活跃矿工数量
-        active_miners = redis_client.scard('xmr:active_miners') or 0
+        # 获取活跃矿工数（带缓存）
+        active_miners = get_active_miners()
 
         # 从数据库获取总奖励
         conn = get_db_connection()
@@ -130,7 +163,7 @@ def pool_status():
             'hashrate_15m': stratum_data['hashrate_15m'],
             'hashrate_1h': stratum_data['hashrate_1h'],
             'hashrate_24h': stratum_data['hashrate_24h'],
-            'active_miners': int(active_miners),
+            'active_miners': active_miners,
             'total_rewards_xmr': total_rewards_xmr,
             'total_rewards_tari': total_rewards_tari
         })
@@ -146,7 +179,8 @@ def user_info(username):
         
         # 获取用户账户信息
         cur.execute("""
-            SELECT * FROM account 
+            SELECT username, xmr_balance, tari_balance, created_at, updated_at
+            FROM account 
             WHERE username = %s
         """, (username,))
         account = cur.fetchone()
@@ -156,7 +190,13 @@ def user_info(username):
         
         # 获取用户奖励历史
         cur.execute("""
-            SELECT r.block_height as height, r.type, r.reward as amount, r.shares, b.time as timestamp
+            SELECT 
+                r.block_height as height,
+                r.type,
+                r.reward as amount,
+                r.shares,
+                b.time as timestamp,
+                b.total_shares
             FROM rewards r
             JOIN blocks b ON r.block_height = b.block_height
             WHERE r.username = %s 
@@ -168,11 +208,16 @@ def user_info(username):
             reward = dict(row)
             reward['amount'] = float(reward['amount'])
             reward['shares'] = float(reward['shares'])
+            reward['total_shares'] = float(reward['total_shares'])
             rewards.append(reward)
         
         # 获取用户支付历史
         cur.execute("""
-            SELECT time as timestamp, txid, amount, type
+            SELECT 
+                time as timestamp,
+                txid,
+                amount,
+                type
             FROM payment 
             WHERE username = %s 
             ORDER BY time DESC 
@@ -194,6 +239,8 @@ def user_info(username):
             'username': username,
             'xmr_balance': float(account['xmr_balance']),
             'tari_balance': float(account['tari_balance']),
+            'created_at': account['created_at'].isoformat(),
+            'updated_at': account['updated_at'].isoformat(),
             'current_hashrate': current_hashrate,
             'rewards': rewards,
             'payments': payments
