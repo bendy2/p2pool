@@ -68,6 +68,53 @@ function getUsernameFromPath() {
     return match ? match[1] : null;
 }
 
+// 更新奖励历史
+function updateRewardsHistory(rewards) {
+    const rewardsList = document.getElementById('rewards-list');
+    rewardsList.innerHTML = '';
+    
+    rewards.forEach(reward => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${formatTime(reward.timestamp)}</td>
+            <td>${reward.height}</td>
+            <td>
+                <span class="block-type block-type-${reward.type.toLowerCase()}">
+                    ${reward.type.toUpperCase()}
+                </span>
+            </td>
+            <td>${reward.type === 'xmr' ? formatXMR(reward.amount) : formatTARI(reward.amount)}</td>
+            <td>${formatNumber(reward.shares)}</td>
+        `;
+        rewardsList.appendChild(row);
+    });
+}
+
+// 更新支付历史
+function updatePaymentsHistory(payments) {
+    const paymentsList = document.getElementById('payments-list');
+    paymentsList.innerHTML = '';
+    
+    payments.forEach(payment => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${formatTime(payment.timestamp)}</td>
+            <td>
+                <a href="https://explorer.tari.com/transaction/${payment.txid}" target="_blank" class="txid-link">
+                    ${payment.txid}
+                </a>
+            </td>
+            <td>
+                <span class="block-type block-type-${payment.type.toLowerCase()}">
+                    ${payment.type.toUpperCase()}
+                </span>
+            </td>
+            <td>${payment.type === 'xmr' ? formatXMR(payment.amount) : formatTARI(payment.amount)}</td>
+        `;
+        paymentsList.appendChild(row);
+    });
+}
+
 // 更新用户信息
 function updateUserInfo() {
     const username = getUsernameFromPath();
