@@ -779,6 +779,36 @@ class LogMonitorThread(threading.Thread):
 log_monitor = LogMonitorThread()
 log_monitor.start()
 
+def process_block(block_data):
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        # 设置check_status
+        check_status = block_data['type'].lower() == 'xmr'
+        
+        cur.execute("""
+            INSERT INTO blocks (block_id, height, timestamp, type, reward, is_valid, check_status)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """, (
+            block_data['block_id'],
+            block_data['height'],
+            block_data['timestamp'],
+            block_data['type'],
+            block_data['reward'],
+            True,
+            check_status
+        ))
+        
+        conn.commit()
+        cur.close()
+        conn.close()
+        
+        return True
+    except Exception as e:
+        logger.error(f"处理区块时发生错误: {str(e)}")
+        return False
+
 if __name__ == '__main__':
     logger.info("Starting API server...")
     try:

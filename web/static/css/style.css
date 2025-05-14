@@ -104,4 +104,9 @@ body {
 .block-type-tari {
     background-color: #dc3545;
     color: #fff;
+}
+
+.status-pending {
+    background-color: #ffc107;
+    color: #000;
 } 

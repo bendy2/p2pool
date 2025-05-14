@@ -255,7 +255,8 @@ def get_blocks():
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("""
-            SELECT time as timestamp, block_height as height, type, rewards as reward, block_id, is_valid
+            SELECT time as timestamp, block_height as height, type, rewards as reward, 
+                   block_id, is_valid, check_status
             FROM blocks
             ORDER BY time DESC
             LIMIT 50
@@ -266,7 +267,7 @@ def get_blocks():
         # 格式化区块数据
         formatted_blocks = []
         for block in blocks:
-            timestamp, height, block_type, reward, block_id, is_valid = block
+            timestamp, height, block_type, reward, block_id, is_valid, check_status = block
             
             # 格式化时间
             if timestamp:
@@ -284,13 +285,43 @@ def get_blocks():
                 'type': block_type,
                 'reward': reward,
                 'block_id': block_id,
-                'is_valid': is_valid
+                'is_valid': is_valid,
+                'check_status': check_status
             })
 
         return jsonify(formatted_blocks)
     except Exception as e:
         logger.error(f"获取区块列表失败: {str(e)}")
         return jsonify({'error': str(e)}), 500
+
+def init_db():
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    # 创建blocks表
+    cur.execute('''
+        CREATE TABLE IF NOT EXISTS blocks (
+            id SERIAL PRIMARY KEY,
+            block_id VARCHAR(255),
+            height INTEGER,
+            timestamp TIMESTAMP,
+            type VARCHAR(10),
+            reward DECIMAL(20, 8),
+            is_valid BOOLEAN DEFAULT TRUE,
+            check_status BOOLEAN DEFAULT FALSE
+        )
+    ''')
+    
+    # 为现有数据设置check_status
+    cur.execute('''
+        UPDATE blocks 
+        SET check_status = TRUE 
+        WHERE check_status IS NULL
+    ''')
+    
+    conn.commit()
+    cur.close()
+    conn.close()
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=80, debug=True) 

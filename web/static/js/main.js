@@ -65,7 +65,6 @@ function updateBlocks() {
             
             data.forEach(block => {
                 const row = document.createElement('tr');
-                // 修改类型判断为小写
                 const blockType = block.type.toLowerCase();
                 row.className = blockType === 'xmr' ? 'block-xmr' : 'block-tari';
                 
@@ -82,19 +81,24 @@ function updateBlocks() {
                     hour12: false
                 });
                 
-                // 修改类型类名判断为小写
                 const typeClass = blockType === 'xmr' ? 'block-type-xmr' : 'block-type-tari';
-                const statusClass = block.is_valid ? 'status-valid' : 'status-invalid';
-                const statusText = block.is_valid ? '有效' : '无效';
+                
+                // 修改状态显示逻辑
+                let statusClass, statusText;
+                if (!block.check_status) {
+                    statusClass = 'status-pending';
+                    statusText = '待检查';
+                } else {
+                    statusClass = block.is_valid ? 'status-valid' : 'status-invalid';
+                    statusText = block.is_valid ? '有效' : '无效';
+                }
                 
                 // 修改奖励显示
                 let reward = block.reward;
                 if (blockType === 'xmr') {
-                    // 提取数字部分并格式化为6位小数
                     const amount = parseFloat(reward);
                     reward = `${amount.toFixed(6)} XMR`;
                 } else {
-                    // TARI 保持原样显示
                     reward = reward.replace('TARI', 'XTM');
                 }
                 
