@@ -15,7 +15,7 @@ from queue import Queue
 
 # 配置日志
 logging.basicConfig(
-    level=logging.WARNING,  # 将默认日志级别改为 WARNING
+    level=logging.DEBUG,  # 将默认日志级别改为 WARNING
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
         logging.StreamHandler(),
@@ -207,10 +207,10 @@ def handle_xmr_block(params):
             # 2. 将区块信息写入数据库
             current_time = datetime.now()
             
-            # 插入区块记录 (XMR区块默认为有效，不需要block_id)
+            # 插入区块记录
             cur.execute("""
-                INSERT INTO blocks (block_height, rewards, type, total_shares, time, is_valid)
-                VALUES (%s, %s, 'xmr', %s, %s, TRUE)
+                INSERT INTO blocks (block_height, rewards, type, total_shares, time)
+                VALUES (%s, %s, 'xmr', %s, %s)
                 ON CONFLICT (block_height) DO NOTHING
             """, (block_height, reward, total_shares, current_time))
             
@@ -289,9 +289,8 @@ def handle_tari_block(params):
     logger.info(f"处理 TARI 区块 {params.get('height')} 信息")
     try:
         block_height = params.get('height')
-        block_id = params.get('block_id')
         
-        if not block_height or not block_id:
+        if not block_height:
             return {'error': '缺少必要参数'}
             
         # 首先检查数据库中是否已存在该区块
@@ -327,12 +326,12 @@ def handle_tari_block(params):
             reward = config['rewards']['tari_block_reward']
             current_time = datetime.now()
             
-            # 插入区块记录 (TARI区块需要记录block_id)
+            # 插入区块记录
             cur.execute("""
-                INSERT INTO blocks (block_height, rewards, type, total_shares, time, block_id, is_valid)
-                VALUES (%s, %s, 'tari', %s, %s, %s, TRUE)
+                INSERT INTO blocks (block_height, rewards, type, total_shares, time)
+                VALUES (%s, %s, 'tari', %s, %s)
                 ON CONFLICT (block_height) DO NOTHING
-            """, (block_height, reward, total_shares, current_time, block_id))
+            """, (block_height, reward, total_shares, current_time))
             
             # 3. 计算用户奖励
             tari_fee = config['pool_fees']['tari_fee']
@@ -386,7 +385,6 @@ def handle_tari_block(params):
             return {
                 'success': True,
                 'block_height': block_height,
-                'block_id': block_id,
                 'total_shares': total_shares,
                 'net_reward': net_reward,
                 'reward': reward,
@@ -726,7 +724,7 @@ class LogMonitorThread(threading.Thread):
         
         # 编译正则表达式模式
         self.xmr_block_pattern = re.compile(r'got a payout of ([\d.]+) XMR in block (\d+)')
-        self.tari_block_pattern = re.compile(r'Mined Tari block ([a-f0-9]+) at height (\d+)')
+        self.tari_block_pattern = re.compile(r'Mined Tari block [a-f0-9]+ at height (\d+)')
         
     def run(self):
         try:
@@ -759,18 +757,17 @@ class LogMonitorThread(threading.Thread):
                 reward = float(xmr_match.group(1))
                 height = int(xmr_match.group(2))
                 logger.info(f"检测到 XMR 爆块 - 高度: {height}, 奖励: {reward}")
-                # XMR区块不需要block_id，且默认为有效
+                # 直接调用处理函数，让处理函数进行数据库检查
                 handle_xmr_block({'height': height, 'reward': reward})
                 return
                 
             # 检查 TARI 爆块信息
             tari_match = self.tari_block_pattern.search(line)
             if tari_match:
-                block_id = tari_match.group(1)
-                height = int(tari_match.group(2))
-                logger.info(f"检测到 TARI 爆块 - ID: {block_id}, 高度: {height}")
-                # TARI区块需要记录block_id
-                handle_tari_block({'height': height, 'block_id': block_id})
+                height = int(tari_match.group(1))
+                logger.info(f"检测到 TARI 爆块 - 高度: {height}")
+                # 直接调用处理函数，让处理函数进行数据库检查
+                handle_tari_block({'height': height})
                 
         except Exception as e:
             logger.error(f"处理日志行时出错: {str(e)}")
