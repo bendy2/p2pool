@@ -149,7 +149,7 @@ def handle_submit(params: Dict[str, Any]) -> Dict[str, Any]:
             'submit_counts': submit_counts
         }
         
-        logger.info(f"Share submitted - User: {username}, XMR submits: {submit_counts['xmr']}, TARI submits: {submit_counts['tari']}")
+        #logger.info(f"Share submitted - User: {username}, XMR submits: {submit_counts['xmr']}, TARI submits: {submit_counts['tari']}")
         
         return {
             'result': {
