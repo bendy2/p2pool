@@ -273,10 +273,10 @@ def get_blocks():
                 timestamp = timestamp.strftime('%Y-%m-%d %H:%M:%S')
             
             # 格式化奖励
-            if block_type == 'XMR':
+            if block_type == 'xmr':
                 reward = f"{float(reward):.6f} XMR"
             else:  # TARI
-                reward = f"{float(reward):.2f} TARI"
+                reward = f"{float(reward):.2f} XTM"
             
             formatted_blocks.append({
                 'timestamp': timestamp,

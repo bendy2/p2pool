@@ -74,7 +74,12 @@ function updateBlocks() {
                 
                 // 修改奖励显示
                 let reward = block.reward;
-                if (block.type === 'TARI') {
+                if (block.type === 'XMR') {
+                    // 提取数字部分并格式化为6位小数
+                    const amount = parseFloat(reward);
+                    reward = `${amount.toFixed(6)} XMR`;
+                } else {
+                    // TARI 保持原样显示
                     reward = reward.replace('TARI', 'XTM');
                 }
                 
