@@ -420,13 +420,22 @@ bool StratumServer::on_submit(StratumClient* client, uint32_t id, const char* jo
 					"{\"jsonrpc\":\"2.0\",\"id\":\"0\",\"method\":\"submit\",\"params\":{\"username\":\"%s\"}}", 
 					username);
 				
+				// 添加一个回调函数来处理响应
+				struct WriteCallback {
+					static size_t WriteCallback(void* contents, size_t size, size_t nmemb, void* userp) {
+						// 只返回处理的数据大小，不输出内容
+						return size * nmemb;
+					}
+				};
+				
 				curl_easy_setopt(curl, CURLOPT_URL, "http://127.0.0.1:5000/json_rpc");
 				curl_easy_setopt(curl, CURLOPT_POSTFIELDS, json_request);
 				curl_easy_setopt(curl, CURLOPT_HTTPHEADER, curl_slist_append(nullptr, "Content-Type: application/json"));
-				curl_easy_setopt(curl, CURLOPT_NOBODY, 1L); 
-				curl_easy_setopt(curl, CURLOPT_POST, 1L);  // 确保使用 POST 方法
-				curl_easy_setopt(curl, CURLOPT_TIMEOUT, 3L);  // 设置超时时间
-				curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 2L);  // 设置连接超时
+				curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback::WriteCallback); // 设置写入回调
+				curl_easy_setopt(curl, CURLOPT_POST, 1L);
+				curl_easy_setopt(curl, CURLOPT_TIMEOUT, 3L);
+				curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 2L);
+				
 				CURLcode res = curl_easy_perform(curl);
 				if (res != CURLE_OK) {
 					LOGWARN(4, "Failed to send user submit info to local API: " << curl_easy_strerror(res));
