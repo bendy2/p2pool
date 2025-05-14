@@ -197,7 +197,12 @@ def handle_xmr_block(params):
             total_shares = 0
             user_shares = {}
             for key in redis_client.keys('xmr:submit:*'):
-                username = key.split(':')[-1]
+                # 只删除前缀，保留完整的用户名
+                data = key.replace(XMR_PREFIX, '')
+                username = data.split(':')[1]
+                xmr_wallet = data.split(':')[0]
+                tari_wallet = data.split(':')[1]
+
                 shares = int(redis_client.get(key) or 0)
                 total_shares += shares
                 user_shares[username] = shares
@@ -226,10 +231,10 @@ def handle_xmr_block(params):
                     
                     # 检查用户是否存在，不存在则创建
                     cur.execute("""
-                        INSERT INTO account (username, xmr_balance, tari_balance, fee)
-                        VALUES (%s, 0, 0, %s)
+                        INSERT INTO account (username, xmr_wallet, tari_wallet, xmr_balance, tari_balance, fee)
+                        VALUES (%s, %s, %s, 0, 0, %s)
                         ON CONFLICT (username) DO NOTHING
-                    """, (username, fee))
+                    """, (username, xmr_wallet, tari_wallet, fee))
                     
                     # 检查是否已存在该用户的奖励记录
                     cur.execute("""
@@ -312,7 +317,8 @@ def handle_tari_block(params):
             total_shares = 0
             user_shares = {}
             for key in redis_client.keys('tari:submit:*'):
-                username = key.split(':')[-1]
+                # 只删除前缀，保留完整的用户名
+                username = key.replace(TARI_PREFIX, '')
                 shares = int(redis_client.get(key) or 0)
                 total_shares += shares
                 user_shares[username] = shares
@@ -344,10 +350,10 @@ def handle_tari_block(params):
                     
                     # 检查用户是否存在，不存在则创建
                     cur.execute("""
-                        INSERT INTO account (username, tari_balance, xmr_balance, fee)
-                        VALUES (%s, 0, 0, %s)
+                        INSERT INTO account (username, xmr_wallet, tari_wallet, tari_balance, xmr_balance, fee)
+                        VALUES (%s, %s, %s, 0, 0, %s)
                         ON CONFLICT (username) DO NOTHING
-                    """, (username, fee))
+                    """, (username, xmr_wallet, tari_wallet, fee))
                     
                     # 检查是否已存在该用户的奖励记录
                     cur.execute("""
