@@ -47,7 +47,7 @@ def get_db_connection():
 
 def read_stratum_data():
     try:
-        with open('.api/local/stratum', 'r') as f:
+        with open('./api/local/stratum', 'r') as f:
             data = json.load(f)
             return {
                 'hashrate_15m': data.get('hashrate_15m', 0),
