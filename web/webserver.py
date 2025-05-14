@@ -179,7 +179,7 @@ def pool_status():
                 parts = worker.split(',')
                 if len(parts) >= 5:
                     username = parts[4]
-                    hashrate = float(parts[1])
+                    hashrate = float(parts[3])
                     
                     # 合并同一用户的算力
                     if username in miner_hashrates:
