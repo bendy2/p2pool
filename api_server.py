@@ -12,6 +12,7 @@ import threading
 import subprocess
 import re
 from queue import Queue
+import requests
 
 # 配置日志
 logging.basicConfig(
@@ -806,10 +807,196 @@ def process_block(block_data):
         logger.error(f"处理区块时发生错误: {str(e)}")
         return False
 
+class TariBlockChecker(threading.Thread):
+    def __init__(self, db_config):
+        super().__init__()
+        self.daemon = True
+        self.running = True
+        self.db_config = db_config
+        self.api_url = "https://explore.tari.com/blocks/{height}?json"
+        self.check_interval = 60  # 检查间隔（秒）
+
+    def buffer_to_hex(self, buffer_data):
+        """将 Buffer 数据转换为十六进制字符串"""
+        if not isinstance(buffer_data, dict) or 'data' not in buffer_data:
+            return ''
+        return ''.join([f'{x:02x}' for x in buffer_data['data']])
+
+    def get_block_from_api(self, height):
+        """从 API 获取区块数据"""
+        try:
+            url = self.api_url.format(height=height)
+            response = requests.get(url, timeout=10)
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.RequestException as e:
+            logger.warning(f"获取区块 {height} 数据失败: {e}")
+            return None
+
+    def get_unchecked_block(self):
+        """从数据库获取一个未检查的区块"""
+        try:
+            conn = get_db_connection()
+            cur = conn.cursor()
+            cur.execute("""
+                SELECT id, block_height, block_id 
+                FROM blocks 
+                WHERE check_status = false 
+                AND type = 'tari'
+                ORDER BY block_height ASC 
+                LIMIT 1
+            """)
+            block = cur.fetchone()
+            cur.close()
+            conn.close()
+            return block
+        except Exception as e:
+            logger.error(f"获取未检查区块失败: {e}")
+            return None
+
+    def update_block_status(self, block_id, is_valid, remote_hash=None):
+        """更新区块状态"""
+        try:
+            conn = get_db_connection()
+            cur = conn.cursor()
+            
+            if is_valid:
+                cur.execute("""
+                    UPDATE blocks 
+                    SET check_status = true, 
+                        is_valid = true
+                    WHERE id = %s
+                """, (datetime.now(), remote_hash, block_id))
+            else:
+                cur.execute("""
+                    UPDATE blocks 
+                    SET check_status = true, 
+                        is_valid = false
+                    WHERE id = %s
+                """, (datetime.now(), remote_hash, block_id))
+            
+            conn.commit()
+            cur.close()
+            conn.close()
+        except Exception as e:
+            logger.error(f"更新区块状态失败: {e}")
+
+    def check_block(self):
+        """检查一个区块"""
+        block = self.get_unchecked_block()
+        if not block:
+            logger.info("没有需要检查的区块")
+            return
+
+        logger.info(f"开始检查区块 {block[1]}")  # block[1] 是 block_height
+        api_data = self.get_block_from_api(block[1])
+        
+        if not api_data:
+            logger.info(f"远程未找到区块 {block[1]}，跳过")
+            return
+
+        try:
+            header = api_data.get('header', {})
+            remote_hash = self.buffer_to_hex(header.get('hash', {}))
+            
+            if not remote_hash:
+                logger.warning(f"区块 {block[1]} 远程哈希无效")
+                return
+
+            # 更新区块状态
+            self.update_block_status(block[0], True, remote_hash)
+            logger.info(f"区块 {block[1]} 验证成功")
+
+        except Exception as e:
+            logger.error(f"检查区块 {block[1]} 时发生错误: {e}")
+            # 如果发生错误，将区块标记为无效
+            self.handle_invalid_block(block[0], block[1])
+
+    def handle_invalid_block(self, block_id, block_height):
+        """处理无效区块"""
+        try:
+            conn = get_db_connection()
+            cur = conn.cursor()
+            
+            # 1. 更新区块状态为无效
+            cur.execute("""
+                UPDATE blocks 
+                SET check_status = true, 
+                    is_valid = false
+                WHERE id = %s
+            """, (block_id,))
+            
+            # 2. 获取该区块的所有奖励记录
+            cur.execute("""
+                SELECT username, reward, type
+                FROM rewards 
+                WHERE block_height = %s
+            """, (block_height,))
+            rewards = cur.fetchall()
+            
+            # 3. 回滚用户余额
+            for reward in rewards:
+                username, amount, reward_type = reward
+                if reward_type == 'tari':
+                    cur.execute("""
+                        UPDATE account 
+                        SET tari_balance = tari_balance - %s
+                        WHERE username = %s
+                    """, (amount, username))
+                elif reward_type == 'xmr':
+                    cur.execute("""
+                        UPDATE account 
+                        SET xmr_balance = xmr_balance - %s
+                        WHERE username = %s
+                    """, (amount, username))
+            
+            # 4. 删除奖励记录
+            cur.execute("""
+                DELETE FROM rewards 
+                WHERE block_height = %s
+            """, (block_height,))
+            
+            # 5. 删除区块记录
+            cur.execute("""
+                DELETE FROM blocks 
+                WHERE id = %s
+            """, (block_id,))
+            
+            conn.commit()
+            logger.info(f"区块 {block_height} 已标记为无效并清理相关数据")
+            
+        except Exception as e:
+            conn.rollback()
+            logger.error(f"处理无效区块 {block_height} 时发生错误: {e}")
+        finally:
+            cur.close()
+            conn.close()
+
+    def run(self):
+        """运行检查器"""
+        while self.running:
+            try:
+                self.check_block()
+            except Exception as e:
+                logger.error(f"检查器运行错误: {e}")
+            time.sleep(self.check_interval)
+
+    def stop(self):
+        """停止检查器"""
+        self.running = False
+
+# 在 main 函数中添加检查器的启动代码
 if __name__ == '__main__':
     logger.info("Starting API server...")
     try:
+        # 启动 Tari 区块检查器
+        tari_checker = TariBlockChecker(config['database'])
+        tari_checker.start()
+        
+        # 启动 API 服务器
         app.run(host='0.0.0.0', port=5000)
     finally:
-        # 确保在服务器关闭时停止日志监控线程
-        log_monitor.stop() 
+        # 确保在服务器关闭时停止所有线程
+        log_monitor.stop()
+        if 'tari_checker' in locals():
+            tari_checker.stop() 
