@@ -58,7 +58,8 @@ function formatHashrate(hashrate) {
 // 更新用户信息
 async function updateUserInfo() {
     try {
-        const username = document.querySelector('.navbar-brand').textContent.split(' - ')[0];
+        // 从URL路径获取用户名
+        const username = window.location.pathname.split('/').pop();
         const response = await fetch(`/api/user/${username}`);
         const data = await response.json();
         
