@@ -1,8 +1,5 @@
 {
-    "pool_fees": {
-        "xmr_fee": 0.05,
-        "tari_fee": 0.05
-    },
+    "pool_fees":  0.08,
     "rewards": {
         "tari_block_reward": 13850
     },

@@ -206,31 +206,29 @@ def handle_xmr_block(params):
                 
             # 2. 将区块信息写入数据库
             current_time = datetime.now()
-            
+            value = reward / total_shares
             # 插入区块记录
             cur.execute("""
-                INSERT INTO blocks (block_height, rewards, type, total_shares, time)
-                VALUES (%s, %s, 'xmr', %s, %s)
+                INSERT INTO blocks (block_height, rewards, type, total_shares, time, value, is_valid, check_status)
+                VALUES (%s, %s, 'xmr', %s, %s, %s, %s, True)
                 ON CONFLICT (block_height) DO NOTHING
-            """, (block_height, reward, total_shares, current_time))
+            """, (block_height, reward, total_shares, current_time, value, True))
             
             # 3. 计算用户奖励
-            xmr_fee = config['pool_fees']['xmr_fee']
-            net_reward = reward * (1 - xmr_fee)  # 扣除矿池费用后的奖励
+            fee = config['pool_fees']
             
             # 4. 记录用户奖励
             for username, shares in user_shares.items():
                 if shares > 0:
                     # 计算用户奖励比例
-                    reward_ratio = shares / total_shares
-                    user_reward = net_reward * reward_ratio
+                    user_reward = value * shares * (1 - fee)
                     
                     # 检查用户是否存在，不存在则创建
                     cur.execute("""
-                        INSERT INTO account (username, xmr_balance)
-                        VALUES (%s, 0)
+                        INSERT INTO account (username, xmr_balance, tari_balance, fee)
+                        VALUES (%s, 0, 0, %s)
                         ON CONFLICT (username) DO NOTHING
-                    """, (username,))
+                    """, (username, fee))
                     
                     # 检查是否已存在该用户的奖励记录
                     cur.execute("""
@@ -267,7 +265,6 @@ def handle_xmr_block(params):
                 'success': True,
                 'block_height': block_height,
                 'total_shares': total_shares,
-                'net_reward': net_reward,
                 'time': current_time.isoformat()
             }
             
@@ -324,32 +321,31 @@ def handle_tari_block(params):
             # 2. 将区块信息写入数据库
             # 从配置文件获取TARI区块奖励
             reward = config['rewards']['tari_block_reward']
+            value = reward / total_shares
             current_time = datetime.now()
             
             # 插入区块记录
             cur.execute("""
-                INSERT INTO blocks (block_height, rewards, type, total_shares, time)
-                VALUES (%s, %s, 'tari', %s, %s)
+                INSERT INTO blocks (block_height, rewards, type, total_shares, time, value, is_valid, check_status)
+                VALUES (%s, %s, 'tari', %s, %s, %s, %s, False)
                 ON CONFLICT (block_height) DO NOTHING
-            """, (block_height, reward, total_shares, current_time))
+            """, (block_height, reward, total_shares, current_time, value, False))
             
             # 3. 计算用户奖励
-            tari_fee = config['pool_fees']['tari_fee']
-            net_reward = reward * (1 - tari_fee)  # 扣除矿池费用后的奖励
+            fee = config['pool_fees']
             
             # 4. 记录用户奖励
             for username, shares in user_shares.items():
                 if shares > 0:
                     # 计算用户奖励比例
-                    reward_ratio = shares / total_shares
-                    user_reward = net_reward * reward_ratio
+                    user_reward = value * shares * (1 - fee)
                     
                     # 检查用户是否存在，不存在则创建
                     cur.execute("""
-                        INSERT INTO account (username, tari_balance)
-                        VALUES (%s, 0)
+                        INSERT INTO account (username, tari_balance, xmr_balance, fee)
+                        VALUES (%s, 0, 0, %s)
                         ON CONFLICT (username) DO NOTHING
-                    """, (username,))
+                    """, (username, fee))
                     
                     # 检查是否已存在该用户的奖励记录
                     cur.execute("""
@@ -386,7 +382,6 @@ def handle_tari_block(params):
                 'success': True,
                 'block_height': block_height,
                 'total_shares': total_shares,
-                'net_reward': net_reward,
                 'reward': reward,
                 'time': current_time.isoformat()
             }

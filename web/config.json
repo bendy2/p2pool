@@ -1,0 +1,14 @@
+{
+    "database": {
+        "host": "localhost",
+        "port": 5432,
+        "dbname": "p2pool",
+        "user": "postgres",
+        "password": "postgres"
+    },
+    "fee": 0.08,
+    "min_payout": {
+        "xmr": 0.01,
+        "tari": 1.0
+    }
+} 
