@@ -821,11 +821,20 @@ class TariBlockChecker(threading.Thread):
         if not isinstance(buffer_data, dict) or 'data' not in buffer_data:
             return ''
         return ''.join([f'{x:02x}' for x in buffer_data['data']])
-
+    def get_block_data(block_height: int) -> Dict[str, Any]:
+        """获取指定高度的区块数据"""
+        url = f'https://textexplore.tari.com/blocks/{block_height}?json'
+        try:
+            response = requests.get(url)
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.RequestException as e:
+            print(f"获取区块数据失败: {e}")
+            return None
     def get_block_from_api(self, height):
         """从 API 获取区块数据"""
         try:
-            url = self.api_url.format(height=height)
+            url = f'https://textexplore.tari.com/blocks/{block_height}?json'
             response = requests.get(url, timeout=10)
             response.raise_for_status()
             
