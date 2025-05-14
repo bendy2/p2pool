@@ -47,7 +47,7 @@ def get_db_connection():
 
 def read_stratum_data():
     try:
-        with open('/tmp/p2pool/local/stratum', 'r') as f:
+        with open('../stratum', 'r') as f:
             data = json.load(f)
             return {
                 'hashrate_15m': data.get('hashrate_15m', 0),
@@ -110,7 +110,7 @@ def pool_status():
             FROM blocks 
             WHERE type = 'xmr'
         """)
-        total_rewards_xmr = cur.fetchone()['total'] or 0
+        total_rewards_xmr = float(cur.fetchone()['total'] or 0)
 
         # 获取TARI总奖励
         cur.execute("""
@@ -118,7 +118,7 @@ def pool_status():
             FROM blocks 
             WHERE type = 'tari'
         """)
-        total_rewards_tari = cur.fetchone()['total'] or 0
+        total_rewards_tari = float(cur.fetchone()['total'] or 0)
 
         cur.close()
         conn.close()
@@ -131,8 +131,8 @@ def pool_status():
             'hashrate_1h': stratum_data['hashrate_1h'],
             'hashrate_24h': stratum_data['hashrate_24h'],
             'active_miners': int(active_miners),
-            'total_rewards_xmr': float(total_rewards_xmr),
-            'total_rewards_tari': float(total_rewards_tari)
+            'total_rewards_xmr': total_rewards_xmr,
+            'total_rewards_tari': total_rewards_tari
         })
     except Exception as e:
         logger.error(f"获取矿池状态失败: {str(e)}")
@@ -163,7 +163,12 @@ def user_info(username):
             ORDER BY b.time DESC 
             LIMIT 20
         """, (username,))
-        rewards = [dict(row) for row in cur.fetchall()]
+        rewards = []
+        for row in cur.fetchall():
+            reward = dict(row)
+            reward['amount'] = float(reward['amount'])
+            reward['shares'] = float(reward['shares'])
+            rewards.append(reward)
         
         # 获取用户支付历史
         cur.execute("""
@@ -173,7 +178,11 @@ def user_info(username):
             ORDER BY time DESC 
             LIMIT 20
         """, (username,))
-        payments = [dict(row) for row in cur.fetchall()]
+        payments = []
+        for row in cur.fetchall():
+            payment = dict(row)
+            payment['amount'] = float(payment['amount'])
+            payments.append(payment)
         
         # 获取用户当前算力
         current_hashrate = get_user_hashrate(username)
@@ -208,7 +217,12 @@ def get_blocks(chain_type):
             LIMIT 20
         """, (chain_type,))
         
-        blocks = [dict(row) for row in cur.fetchall()]
+        blocks = []
+        for row in cur.fetchall():
+            block = dict(row)
+            # 将Decimal类型转换为float
+            block['reward'] = float(block['reward'])
+            blocks.append(block)
         
         cur.close()
         conn.close()
