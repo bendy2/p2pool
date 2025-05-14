@@ -141,7 +141,7 @@ def pool_status():
         cur.execute("""
             SELECT COALESCE(SUM(rewards), 0) as total
             FROM blocks 
-            WHERE type = 'xmr'
+            WHERE type = 'xmr' AND is_valid = TRUE
         """)
         total_rewards_xmr = float(cur.fetchone()['total'] or 0)
 
@@ -149,7 +149,7 @@ def pool_status():
         cur.execute("""
             SELECT COALESCE(SUM(rewards), 0) as total
             FROM blocks 
-            WHERE type = 'tari'
+            WHERE type = 'tari' AND is_valid = TRUE
         """)
         total_rewards_tari = float(cur.fetchone()['total'] or 0)
 

@@ -115,9 +115,32 @@ function updatePoolStatus() {
     fetch('/api/pool_status')
         .then(response => response.json())
         .then(data => {
-            document.getElementById('total-hashrate').textContent = data.total_hashrate;
-            document.getElementById('xmr-balance').textContent = data.xmr_balance;
-            document.getElementById('tari-balance').textContent = data.tari_balance;
+            // 格式化算力显示
+            const formatHashrate = (hashrate) => {
+                if (hashrate >= 1e9) {
+                    return (hashrate / 1e9).toFixed(2) + ' GH/s';
+                } else if (hashrate >= 1e6) {
+                    return (hashrate / 1e6).toFixed(2) + ' MH/s';
+                } else if (hashrate >= 1e3) {
+                    return (hashrate / 1e3).toFixed(2) + ' KH/s';
+                } else {
+                    return hashrate.toFixed(2) + ' H/s';
+                }
+            };
+
+            // 格式化余额显示
+            const formatBalance = (balance, type) => {
+                if (type === 'XMR') {
+                    return parseFloat(balance).toFixed(6) + ' XMR';
+                } else {
+                    return parseFloat(balance).toFixed(2) + ' XTM';
+                }
+            };
+
+            // 更新显示
+            document.getElementById('total-hashrate').textContent = formatHashrate(data.hashrate_15m);
+            document.getElementById('xmr-balance').textContent = formatBalance(data.total_rewards_xmr, 'XMR');
+            document.getElementById('tari-balance').textContent = formatBalance(data.total_rewards_tari, 'TARI');
         })
         .catch(error => console.error('获取矿池状态失败:', error));
 }
