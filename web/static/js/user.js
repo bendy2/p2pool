@@ -61,9 +61,20 @@ function formatFee(fee) {
     return (fee * 100).toFixed(2) + '%';
 }
 
+// 从URL路径中获取用户名
+function getUsernameFromPath() {
+    const path = window.location.pathname;
+    const match = path.match(/\/u\/([^\/]+)/);
+    return match ? match[1] : null;
+}
+
 // 更新用户信息
 function updateUserInfo() {
-    const username = document.getElementById('username').textContent;
+    const username = getUsernameFromPath();
+    if (!username) {
+        console.error('无法获取用户名');
+        return;
+    }
     
     fetch(`/api/user/${username}`)
         .then(response => response.json())
