@@ -5,23 +5,41 @@ function formatNumber(num) {
 
 // 格式化时间（北京时间）
 function formatTime(timestamp) {
-    const date = new Date(timestamp * 1000);
-    // 转换为北京时间（UTC+8）
-    const beijingTime = new Date(date.getTime() + 8 * 60 * 60 * 1000);
-    return beijingTime.toLocaleString('zh-CN', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: false
-    });
+    if (!timestamp) return '未知时间';
+    
+    try {
+        // 直接解析GMT时间字符串
+        const date = new Date(timestamp);
+        
+        // 检查日期是否有效
+        if (isNaN(date.getTime())) return '无效时间';
+        
+        // 转换为北京时间（UTC+8）
+        const beijingTime = new Date(date.getTime() + 8 * 60 * 60 * 1000);
+        
+        return beijingTime.toLocaleString('zh-CN', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false
+        });
+    } catch (error) {
+        console.error('时间格式化错误:', error);
+        return '时间错误';
+    }
 }
 
 // 格式化XMR金额
 function formatXMR(amount) {
-    return (amount / 1e12).toFixed(12) + ' XMR';
+    return amount.toFixed(6) + ' XMR';
+}
+
+// 格式化TARI金额
+function formatTARI(amount) {
+    return amount.toFixed(2) + ' TARI';
 }
 
 // 格式化算力
@@ -40,7 +58,7 @@ function formatHashrate(hashrate) {
 // 更新用户信息
 async function updateUserInfo() {
     try {
-        const username = window.location.pathname.split('/').pop();
+        const username = document.querySelector('.navbar-brand').textContent.split(' - ')[0];
         const response = await fetch(`/api/user/${username}`);
         const data = await response.json();
         
@@ -49,9 +67,10 @@ async function updateUserInfo() {
             return;
         }
 
+        // 更新用户信息
         document.getElementById('current-hashrate').textContent = formatHashrate(data.current_hashrate);
-        document.getElementById('total-rewards').textContent = formatXMR(data.total_rewards);
-        document.getElementById('balance').textContent = formatXMR(data.balance);
+        document.getElementById('xmr-balance').textContent = formatXMR(data.xmr_balance);
+        document.getElementById('tari-balance').textContent = formatTARI(data.tari_balance);
 
         // 更新奖励历史
         const rewardsList = document.getElementById('rewards-list');
@@ -61,7 +80,9 @@ async function updateUserInfo() {
             tr.innerHTML = `
                 <td>${formatTime(reward.timestamp)}</td>
                 <td>${formatNumber(reward.height)}</td>
-                <td>${formatXMR(reward.amount)}</td>
+                <td>${reward.type.toUpperCase()}</td>
+                <td>${reward.type === 'xmr' ? formatXMR(reward.amount) : formatTARI(reward.amount)}</td>
+                <td>${formatNumber(reward.shares)}</td>
             `;
             rewardsList.appendChild(tr);
         });
@@ -74,8 +95,8 @@ async function updateUserInfo() {
             tr.innerHTML = `
                 <td>${formatTime(payment.timestamp)}</td>
                 <td>${payment.txid}</td>
-                <td>${formatXMR(payment.amount)}</td>
-                <td>${payment.status}</td>
+                <td>${payment.type.toUpperCase()}</td>
+                <td>${payment.type === 'xmr' ? formatXMR(payment.amount) : formatTARI(payment.amount)}</td>
             `;
             paymentsList.appendChild(tr);
         });
