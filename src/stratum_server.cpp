@@ -425,10 +425,8 @@ bool StratumServer::on_submit(StratumClient* client, uint32_t id, const char* jo
 				curl_easy_setopt(curl, CURLOPT_HTTPHEADER, curl_slist_append(nullptr, "Content-Type: application/json"));
 				curl_easy_setopt(curl, CURLOPT_NOBODY, 1L); 
 				curl_easy_setopt(curl, CURLOPT_POST, 1L);  // 确保使用 POST 方法
-				curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10L);  // 设置超时时间
-				curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 5L);  // 设置连接超时
-				curl_easy_setopt(curl, CURLOPT_WRITEDATA, nullptr);
-				
+				curl_easy_setopt(curl, CURLOPT_TIMEOUT, 3L);  // 设置超时时间
+				curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 2L);  // 设置连接超时
 				CURLcode res = curl_easy_perform(curl);
 				if (res != CURLE_OK) {
 					LOGWARN(4, "Failed to send user submit info to local API: " << curl_easy_strerror(res));
