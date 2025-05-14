@@ -222,8 +222,8 @@ def handle_xmr_block(params):
                 if result:
                     xmr_wallet, tari_wallet = result
                 else:
-                    logger.warning(f"用户 {username} 不存在，跳过")
-                    continue
+                    xmr_wallet = ""
+                    tari_wallet = ""
 
                 shares = int(redis_client.get(key) or 0)
                 total_shares += shares
