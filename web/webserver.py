@@ -218,7 +218,7 @@ def user_info(username):
                 txid,
                 amount,
                 type
-            FROM payments 
+            FROM payment 
             WHERE username = %s 
             ORDER BY time DESC 
             LIMIT 20
