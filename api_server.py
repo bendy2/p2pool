@@ -560,7 +560,8 @@ def get_users():
         
         # 处理XMR提交
         for key in xmr_keys:
-            username = key.split(':')[-1]
+            # 只删除前缀，保留完整的用户名
+            username = key.replace(XMR_PREFIX, '')
             shares = int(redis_client.get(key) or 0)
             
             if username not in active_users:
@@ -577,7 +578,8 @@ def get_users():
         
         # 处理TARI提交
         for key in tari_keys:
-            username = key.split(':')[-1]
+            # 只删除前缀，保留完整的用户名
+            username = key.replace(TARI_PREFIX, '')
             shares = int(redis_client.get(key) or 0)
             
             if username not in active_users:
