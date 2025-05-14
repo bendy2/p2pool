@@ -286,7 +286,7 @@ def handle_tari_block(params):
     logger.info(f"处理 TARI 区块 {params.get('height')} 信息")
     try:
         block_height = params.get('height')
-        
+        block_id = params.get('block_id')
         if not block_height:
             return {'error': '缺少必要参数'}
             
@@ -303,7 +303,8 @@ def handle_tari_block(params):
                 return {
                     'success': True,
                     'message': 'Block already exists in database',
-                    'block_height': block_height
+                    'block_height': block_height,
+                    'block_id': block_id
                 }
             
             # 1. 统计TARI链的submit总数
@@ -326,10 +327,10 @@ def handle_tari_block(params):
             
             # 插入区块记录
             cur.execute("""
-                INSERT INTO blocks (block_height, rewards, type, total_shares, time, value, is_valid, check_status)
-                VALUES (%s, %s, 'tari', %s, %s, %s, %s, False)
+                INSERT INTO blocks (block_height, rewards, type, total_shares, time, value, is_valid, check_status, block_id)
+                VALUES (%s, %s, 'tari', %s, %s, %s, %s, False, %s)
                 ON CONFLICT (block_height) DO NOTHING
-            """, (block_height, reward, total_shares, current_time, value, False))
+            """, (block_height, reward, total_shares, current_time, value, False, block_id))
             
             # 3. 计算用户奖励
             fee = config['pool_fees']
@@ -719,7 +720,7 @@ class LogMonitorThread(threading.Thread):
         
         # 编译正则表达式模式
         self.xmr_block_pattern = re.compile(r'got a payout of ([\d.]+) XMR in block (\d+)')
-        self.tari_block_pattern = re.compile(r'Mined Tari block [a-f0-9]+ at height (\d+)')
+        self.tari_block_pattern = re.compile(r'Mined Tari block ([a-f0-9]+) at height (\d+)')
         
     def run(self):
         try:
@@ -759,10 +760,11 @@ class LogMonitorThread(threading.Thread):
             # 检查 TARI 爆块信息
             tari_match = self.tari_block_pattern.search(line)
             if tari_match:
-                height = int(tari_match.group(1))
-                logger.info(f"检测到 TARI 爆块 - 高度: {height}")
+                height = int(tari_match.group(2))
+                block_id = tari_match.group(1)
+                logger.info(f"检测到 TARI 爆块 - 高度: {height}, 区块ID: {block_id}")
                 # 直接调用处理函数，让处理函数进行数据库检查
-                handle_tari_block({'height': height})
+                handle_tari_block({'height': height, 'block_id': block_id})
                 
         except Exception as e:
             logger.error(f"处理日志行时出错: {str(e)}")

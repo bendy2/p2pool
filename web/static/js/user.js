@@ -33,14 +33,14 @@ function formatTime(timestamp) {
     }
 }
 
-// 格式化XMR金额
+// 格式化XMR金额（6位小数）
 function formatXMR(amount) {
-    return amount.toFixed(6) + ' XMR';
+    return parseFloat(amount).toFixed(6) + ' XMR';
 }
 
-// 格式化TARI金额
+// 格式化TARI金额（2位小数）
 function formatTARI(amount) {
-    return amount.toFixed(2) + ' TARI';
+    return parseFloat(amount).toFixed(2) + ' XTM';
 }
 
 // 格式化算力
@@ -75,16 +75,24 @@ function updateRewardsHistory(rewards) {
     
     rewards.forEach(reward => {
         const row = document.createElement('tr');
+        // 根据类型格式化金额
+        const formattedAmount = reward.type === 'xmr' 
+            ? formatXMR(reward.amount)
+            : formatTARI(reward.amount);
+            
+        // 根据类型格式化份额
+        const formattedShares = formatNumber(reward.shares);
+        
         row.innerHTML = `
             <td>${formatTime(reward.timestamp)}</td>
             <td>${reward.height}</td>
             <td>
                 <span class="block-type block-type-${reward.type.toLowerCase()}">
-                    ${reward.type.toUpperCase()}
+                    ${reward.type === 'tari' ? 'XTM' : reward.type.toUpperCase()}
                 </span>
             </td>
-            <td>${reward.type === 'xmr' ? formatXMR(reward.amount) : formatTARI(reward.amount)}</td>
-            <td>${formatNumber(reward.shares)}</td>
+            <td>${formattedAmount}</td>
+            <td>${formattedShares}</td>
         `;
         rewardsList.appendChild(row);
     });
@@ -97,6 +105,11 @@ function updatePaymentsHistory(payments) {
     
     payments.forEach(payment => {
         const row = document.createElement('tr');
+        // 根据类型格式化金额
+        const formattedAmount = payment.type === 'xmr' 
+            ? formatXMR(payment.amount)
+            : formatTARI(payment.amount);
+            
         row.innerHTML = `
             <td>${formatTime(payment.timestamp)}</td>
             <td>
@@ -106,10 +119,10 @@ function updatePaymentsHistory(payments) {
             </td>
             <td>
                 <span class="block-type block-type-${payment.type.toLowerCase()}">
-                    ${payment.type.toUpperCase()}
+                    ${payment.type === 'tari' ? 'XTM' : payment.type.toUpperCase()}
                 </span>
             </td>
-            <td>${payment.type === 'xmr' ? formatXMR(payment.amount) : formatTARI(payment.amount)}</td>
+            <td>${formattedAmount}</td>
         `;
         paymentsList.appendChild(row);
     });
