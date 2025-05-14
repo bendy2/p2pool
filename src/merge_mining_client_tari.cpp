@@ -28,7 +28,6 @@
 #include <thread>
 #include <chrono>
 #include <rapidjson/document.h>
-#include <curl/curl.h>
 
 LOG_CATEGORY(MergeMiningClientTari)
 
@@ -285,31 +284,6 @@ void MergeMiningClientTari::submit_solution(const BlockTemplate* block_tpl, cons
 			else {
 				const std::string& h = response.block_hash();
 				LOGINFO(0, log::LightGreen() << "Mined Tari block " << log::hex_buf(h.data(), h.size()) << " at height " << w->block.header().height());
-
-				// 使用 CURL 发送请求
-				CURL* curl = curl_easy_init();
-				if (curl) {
-					char json_request[512];
-					snprintf(json_request, sizeof(json_request), 
-						"{\"jsonrpc\":\"2.0\",\"id\":\"0\",\"method\":\"tari_block\",\"params\":{\"height\":%d}}", 
-						w->block.header().height());
-					
-					struct curl_slist* headers = curl_slist_append(nullptr, "Content-Type: application/json");
-					curl_easy_setopt(curl, CURLOPT_URL, "http://127.0.0.1:5000/json_rpc");
-					curl_easy_setopt(curl, CURLOPT_POSTFIELDS, json_request);
-					curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-					curl_easy_setopt(curl, CURLOPT_POST, 1L);
-					curl_easy_setopt(curl, CURLOPT_TIMEOUT, 3L);
-					curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 2L);
-					
-					CURLcode res = curl_easy_perform(curl);
-					if (res != CURLE_OK) {
-						LOGWARN(4, "Failed to send TARI block info to API server: " << curl_easy_strerror(res));
-					}
-					
-					curl_slist_free_all(headers);
-					curl_easy_cleanup(curl);
-				}
 			}
 		},
 		[](uv_work_t* req, int /*status*/)

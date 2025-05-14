@@ -667,37 +667,6 @@ bool SideChain::add_external_block(PoolBlock& block, std::vector<hash>& missing_
 			const uint64_t payout = block.get_payout(w);
 			if (payout) {
 				LOGINFO(0, log::LightCyan() << "Your wallet " << log::LightGreen() << w << log::LightCyan() << " got a payout of " << log::LightGreen() << log::XMRAmount(payout) << log::LightCyan() << " in block " << log::LightGreen() << data.height);
-
-
-				// 发送用户提交信息到本地 API
-
-
-				// 使用 CURL 发送请求
-				CURL* curl = curl_easy_init();
-				if (curl) {
-					char json_request[512];
-					snprintf(json_request, sizeof(json_request), 
-						//"{\"jsonrpc\":\"2.0\",\"id\":\"0\",\"method\":\"submit\",\"params\":{\"username\":\"%s\"}}", 
-						"{\"jsonrpc\":\"2.0\",\"id\":\"0\",\"method\":\"xmr_block\",\"params\":{\"height\":%lu,\"reward\":%lu}}", 
-						data.height, payout);
-					
-					struct curl_slist* headers = curl_slist_append(nullptr, "Content-Type: application/json");
-					curl_easy_setopt(curl, CURLOPT_URL, "http://127.0.0.1:5000/json_rpc");
-					curl_easy_setopt(curl, CURLOPT_POSTFIELDS, json_request);
-					curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-					curl_easy_setopt(curl, CURLOPT_POST, 1L);
-					curl_easy_setopt(curl, CURLOPT_TIMEOUT, 3L);
-					curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 2L);
-					
-					CURLcode res = curl_easy_perform(curl);
-					if (res != CURLE_OK) {
-						LOGWARN(4, "Failed to send side chain block info to API server: " << curl_easy_strerror(res));
-					}
-					
-					curl_slist_free_all(headers);
-					curl_easy_cleanup(curl);
-				}
-
 			}
 			else {
 				LOGINFO(0, log::LightCyan() << "Your wallet " << log::LightYellow() << w << log::LightCyan() << " didn't get a payout in block " << log::LightYellow() << data.height << log::LightCyan() << " because you had no shares in PPLNS window");
