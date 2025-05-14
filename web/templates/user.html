@@ -20,140 +20,131 @@
         </div>
     </nav>
 
-    <div class="container mt-4">
-        <div class="row">
-            <!-- 用户信息 -->
-            <div class="col-md-4">
-                <div class="card mb-4">
-                    <div class="card-header">
-                        用户信息
-                    </div>
-                    <div class="card-body">
-                        <div class="row">
-                            <div class="col-md-6">
-                                <h5>基本信息</h5>
-                                <table class="table">
-                                    <tr>
-                                        <th>用户名</th>
-                                        <td id="username"></td>
-                                    </tr>
-                                    <tr>
-                                        <th>注册时间</th>
-                                        <td id="created-at"></td>
-                                    </tr>
-                                    <tr>
-                                        <th>当前算力</th>
-                                        <td id="current-hashrate"></td>
-                                    </tr>
-                                    <tr>
-                                        <th>费率</th>
-                                        <td id="user-fee"></td>
-                                    </tr>
-                                </table>
-                            </div>
-                            <div class="col-md-6">
-                                <h5>钱包地址</h5>
-                                <table class="table">
-                                    <tr>
-                                        <th>XMR钱包</th>
-                                        <td>
-                                            <span id="xmr-wallet" class="wallet-address"></span>
-                                            <button class="btn btn-sm btn-outline-primary copy-btn" data-clipboard-target="#xmr-wallet">
-                                                复制
-                                            </button>
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <th>TARI钱包</th>
-                                        <td>
-                                            <span id="tari-wallet" class="wallet-address"></span>
-                                            <button class="btn btn-sm btn-outline-primary copy-btn" data-clipboard-target="#tari-wallet">
-                                                复制
-                                            </button>
-                                        </td>
-                                    </tr>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 余额信息 -->
-                <div class="card mb-4">
-                    <div class="card-header">
-                        余额信息
-                    </div>
-                    <div class="card-body">
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="balance-item">
-                                    <h5>XMR余额</h5>
-                                    <p id="xmr-balance">0.000000 XMR</p>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="balance-item">
-                                    <h5>TARI余额</h5>
-                                    <p id="tari-balance">0.00 XTM</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+    <div class="container-fluid mt-4">
+        <!-- 用户信息 -->
+        <div class="card mb-4">
+            <div class="card-header">
+                用户信息
             </div>
-
-            <!-- 奖励历史 -->
-            <div class="col-md-8">
-                <div class="card">
-                    <div class="card-header">
-                        奖励历史
+            <div class="card-body">
+                <!-- 用户名和统计信息 -->
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <h3 id="username" class="mb-3"></h3>
                     </div>
-                    <div class="card-body">
-                        <div class="table-responsive">
-                            <table class="table table-striped">
-                                <thead>
-                                    <tr>
-                                        <th>时间</th>
-                                        <th>区块高度</th>
-                                        <th>类型</th>
-                                        <th>奖励金额</th>
-                                        <th>份额</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="rewards-list">
-                                    <!-- 数据将通过 JavaScript 动态加载 -->
-                                </tbody>
-                            </table>
+                    <div class="col-md-6">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="stat-item">
+                                    <div class="label">注册时间</div>
+                                    <div id="created-at"></div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="stat-item">
+                                    <div class="label">费率</div>
+                                    <div id="user-fee"></div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="stat-item">
+                                    <div class="label">当前算力</div>
+                                    <div id="current-hashrate"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- XMR钱包和余额 -->
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="wallet-section">
+                            <div class="wallet-header">
+                                <div class="wallet-title">XMR钱包</div>
+                                <div class="wallet-balance">
+                                    <span class="label">余额：</span>
+                                    <span id="xmr-balance" class="balance-value">0.000000 XMR</span>
+                                </div>
+                            </div>
+                            <div class="wallet-address-container">
+                                <span id="xmr-wallet" class="wallet-address"></span>
+                                <button class="btn btn-sm btn-outline-primary copy-btn" data-clipboard-target="#xmr-wallet">
+                                    复制
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TARI钱包和余额 -->
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="wallet-section">
+                            <div class="wallet-header">
+                                <div class="wallet-title">TARI钱包</div>
+                                <div class="wallet-balance">
+                                    <span class="label">余额：</span>
+                                    <span id="tari-balance" class="balance-value">0.00 XTM</span>
+                                </div>
+                            </div>
+                            <div class="wallet-address-container">
+                                <span id="tari-wallet" class="wallet-address"></span>
+                                <button class="btn btn-sm btn-outline-primary copy-btn" data-clipboard-target="#tari-wallet">
+                                    复制
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
 
+        <!-- 奖励历史 -->
+        <div class="card mb-4">
+            <div class="card-header">
+                奖励历史
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>时间</th>
+                                <th>区块高度</th>
+                                <th>类型</th>
+                                <th>奖励金额</th>
+                                <th>份额</th>
+                            </tr>
+                        </thead>
+                        <tbody id="rewards-list">
+                            <!-- 数据将通过 JavaScript 动态加载 -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
         <!-- 支付历史 -->
-        <div class="row mt-4">
-            <div class="col-12">
-                <div class="card">
-                    <div class="card-header">
-                        支付历史
-                    </div>
-                    <div class="card-body">
-                        <div class="table-responsive">
-                            <table class="table table-striped">
-                                <thead>
-                                    <tr>
-                                        <th>时间</th>
-                                        <th>交易ID</th>
-                                        <th>类型</th>
-                                        <th>金额</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="payments-list">
-                                    <!-- 数据将通过 JavaScript 动态加载 -->
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
+        <div class="card">
+            <div class="card-header">
+                支付历史
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>时间</th>
+                                <th>交易ID</th>
+                                <th>类型</th>
+                                <th>金额</th>
+                            </tr>
+                        </thead>
+                        <tbody id="payments-list">
+                            <!-- 数据将通过 JavaScript 动态加载 -->
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
