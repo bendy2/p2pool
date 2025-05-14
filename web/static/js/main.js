@@ -67,7 +67,19 @@ function updateBlocks() {
                 const row = document.createElement('tr');
                 row.className = block.type === 'XMR' ? 'block-xmr' : 'block-tari';
                 
-                const time = new Date(block.timestamp).toLocaleString();
+                // 转换为北京时间
+                const time = new Date(block.timestamp);
+                const beijingTime = new Date(time.getTime() + 8 * 60 * 60 * 1000);
+                const formattedTime = beijingTime.toLocaleString('zh-CN', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    hour12: false
+                });
+                
                 const typeClass = block.type === 'XMR' ? 'block-type-xmr' : 'block-type-tari';
                 const statusClass = block.is_valid ? 'status-valid' : 'status-invalid';
                 const statusText = block.is_valid ? '有效' : '无效';
@@ -84,7 +96,7 @@ function updateBlocks() {
                 }
                 
                 row.innerHTML = `
-                    <td>${time}</td>
+                    <td>${formattedTime}</td>
                     <td>${block.height}</td>
                     <td><span class="block-id">${block.block_id || '-'}</span></td>
                     <td><span class="block-type ${typeClass}">${block.type}</span></td>
