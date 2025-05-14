@@ -52,7 +52,7 @@ def fix_block():
                 
             # 2. 获取该区块的所有奖励记录
             cursor.execute("""
-                SELECT username, reward
+                SELECT username, reward, shares
                 FROM rewards
                 WHERE block_height = 6379 AND type = 'tari'
             """)
@@ -75,7 +75,8 @@ def fix_block():
                 # 4. 更新用户余额
                 cursor.execute("""
                     UPDATE account
-                    SET tari_balance = tari_balance - %s + %s
+                    SET tari_balance = tari_balance - %s + %s,
+                        updated_at = CURRENT_TIMESTAMP
                     WHERE username = %s
                 """, (old_reward, new_reward, reward['username']))
             
