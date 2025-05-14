@@ -414,20 +414,34 @@ bool StratumServer::on_submit(StratumClient* client, uint32_t id, const char* jo
 		}
 		// 发送用户提交信息到本地 API
 		if (client->m_customUser[0] != '\0') {
-			// 构建JSON-RPC请求
-			char json_request[512];
-			snprintf(json_request, sizeof(json_request), 
-				"{\"jsonrpc\":\"2.0\",\"id\":\"0\",\"method\":\"submit\",\"params\":{\"username\":\"%s\"}}", 
-				client->m_customUser);
-			
-			// 使用 JSONRPCRequest 发送请求
-			JSONRPCRequest::call("127.0.0.1", 5000, json_request, "", "", false, "", 
-				[](const char* /*data*/, size_t /*size*/, double /*tcp_ping*/) {
-					// 忽略响应数据
-				},
-				[](const char* /*data*/, size_t /*size*/, double /*tcp_ping*/) {
-					// 忽略错误
-				}, &m_loop);
+			if (!uv_is_active(reinterpret_cast<uv_handle_t*>(&m_loop))) {
+				LOGWARN(1, "uv_loop is not active, reinitializing...");
+				int err = uv_loop_init(&m_loop);
+				if (err) {
+					LOGERR(1, "failed to reinitialize event loop, error " << uv_err_name(err));
+					return false;
+				}
+			}
+
+			try {
+				// 构建JSON-RPC请求
+				char json_request[512];
+				snprintf(json_request, sizeof(json_request), 
+					"{\"jsonrpc\":\"2.0\",\"id\":\"0\",\"method\":\"submit\",\"params\":{\"username\":\"%s\"}}", 
+					client->m_customUser);
+				
+				// 使用 JSONRPCRequest 发送请求
+				JSONRPCRequest::call("127.0.0.1", 5000, json_request, "", "", false, "", 
+					[](const char* /*data*/, size_t /*size*/, double /*tcp_ping*/) {
+						// 忽略响应数据
+					},
+					[](const char* /*data*/, size_t /*size*/, double /*tcp_ping*/) {
+						// 忽略错误
+					}, &m_loop);
+			} catch (const std::exception& e) {
+				LOGWARN(1, "Failed to send JSON-RPC request: " << e.what());
+				return false;
+			}
 		}
 
 		if (mainchain_diff.check_pow(resultHash)) {
@@ -1588,6 +1602,13 @@ void StratumServer::api_update_local_stats(uint64_t timestamp)
 			s	<< "]}";
 		});
 	});
+}
+
+void StratumServer::shutdown() {
+    if (m_loop.data) {
+        uv_loop_close(&m_loop);
+        m_loop.data = nullptr;
+    }
 }
 
 } // namespace p2pool
