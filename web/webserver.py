@@ -196,7 +196,7 @@ def user_info(username):
         
         # 获取用户账户信息
         cur.execute("""
-            SELECT username, xmr_balance, tari_balance, created_at, xmr_wallet, tari_wallet
+            SELECT username, xmr_balance, tari_balance, created_at, xmr_wallet, tari_wallet, fee
             FROM account 
             WHERE username = %s
         """, (username,))
@@ -260,6 +260,7 @@ def user_info(username):
             'current_hashrate': current_hashrate,
             'xmr_wallet': account['xmr_wallet'],
             'tari_wallet': account['tari_wallet'],
+            'fee': float(account['fee']),
             'rewards': rewards,
             'payments': payments
         })

@@ -56,6 +56,11 @@ function formatHashrate(hashrate) {
     }
 }
 
+// 格式化费率显示
+function formatFee(fee) {
+    return (fee * 100).toFixed(2) + '%';
+}
+
 // 更新用户信息
 function updateUserInfo() {
     const username = document.getElementById('username').textContent;
@@ -67,6 +72,7 @@ function updateUserInfo() {
             document.getElementById('username').textContent = data.username;
             document.getElementById('created-at').textContent = new Date(data.created_at).toLocaleString('zh-CN');
             document.getElementById('current-hashrate').textContent = formatHashrate(data.current_hashrate);
+            document.getElementById('user-fee').textContent = formatFee(data.fee);
             
             // 更新钱包地址
             document.getElementById('xmr-wallet').textContent = data.xmr_wallet || '未设置';
