@@ -255,9 +255,9 @@ def get_blocks():
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("""
-            SELECT timestamp, height, type, reward, block_id, is_valid
+            SELECT time as timestamp, block_height as height, type, rewards as reward, block_id, is_valid
             FROM blocks
-            ORDER BY timestamp DESC
+            ORDER BY time DESC
             LIMIT 50
         """)
         blocks = cursor.fetchall()
