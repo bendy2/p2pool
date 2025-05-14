@@ -143,4 +143,101 @@ body {
     font-size: 1.25rem;
     font-weight: 500;
     margin-bottom: 0;
+}
+
+.pool-intro {
+    padding: 20px;
+}
+
+.pool-intro h4 {
+    color: #2c3e50;
+    margin-top: 20px;
+    margin-bottom: 15px;
+    font-weight: 500;
+}
+
+.pool-intro h4:first-child {
+    margin-top: 0;
+}
+
+.pool-intro p {
+    color: #34495e;
+    line-height: 1.6;
+    margin-bottom: 15px;
+}
+
+.pool-intro ul {
+    color: #34495e;
+    line-height: 1.6;
+    padding-left: 20px;
+}
+
+.pool-intro ul li {
+    margin-bottom: 8px;
+}
+
+.config-example {
+    background-color: #f8f9fa;
+    border-radius: 4px;
+    padding: 15px;
+    margin: 15px 0;
+}
+
+.config-example pre {
+    margin: 0;
+    color: #2c3e50;
+    font-family: monospace;
+    font-size: 0.9rem;
+}
+
+/* 调整表格样式 */
+.table-responsive {
+    max-height: 600px;
+    overflow-y: auto;
+}
+
+.table th {
+    position: sticky;
+    top: 0;
+    background-color: #f8f9fa;
+    z-index: 1;
+}
+
+/* 调整卡片样式 */
+.card {
+    margin-bottom: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.card-header {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid rgba(0,0,0,0.125);
+    font-weight: 500;
+}
+
+/* 状态项样式优化 */
+.status-item {
+    text-align: center;
+    padding: 20px;
+    border-radius: 8px;
+    background-color: #f8f9fa;
+    margin-bottom: 10px;
+    transition: transform 0.2s;
+}
+
+.status-item:hover {
+    transform: translateY(-2px);
+}
+
+.status-item h5 {
+    color: #6c757d;
+    margin-bottom: 10px;
+    font-size: 1rem;
+}
+
+.status-item p {
+    color: #212529;
+    font-size: 1.25rem;
+    font-weight: 500;
+    margin-bottom: 0;
 } 

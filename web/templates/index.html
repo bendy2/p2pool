@@ -9,10 +9,10 @@
 </head>
 <body>
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-        <div class="container">
-            <a class="navbar-brand" href="#">Tari-Cpu P2pool分享池</a>
-            <div class="d-flex w-50">
-                <form class="d-flex w-100" action="/u/" method="get">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/">Tari-Cpu P2pool分享池</a>
+            <div class="d-flex">
+                <form class="d-flex" action="/u/" method="get">
                     <input class="form-control me-2" type="search" name="username" placeholder="输入用户名" required>
                     <button class="btn btn-outline-light" type="submit">查询</button>
                 </form>
@@ -20,71 +20,85 @@
         </div>
     </nav>
 
-    <div class="container mt-4">
+    <div class="container-fluid mt-4">
         <!-- 矿池状态 -->
         <div class="row mb-4">
-            <div class="col-md-3">
-                <div class="status-item">
-                    <h5>总算力</h5>
-                    <p id="total-hashrate">0 H/s</p>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="status-item">
-                    <h5>在线矿工</h5>
-                    <p id="active-miners">0</p>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="status-item">
-                    <h5>XMR余额</h5>
-                    <p id="xmr-balance">0.000000 XMR</p>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="status-item">
-                    <h5>TARI余额</h5>
-                    <p id="tari-balance">0.00 XTM</p>
-                </div>
-            </div>
-        </div>
-
-        <!-- 在线矿工列表 -->
-        <div class="card mb-4">
-            <div class="card-header">
-                在线矿工
-            </div>
-            <div class="card-body">
-                <div class="table-responsive">
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th>用户名</th>
-                                <th>算力</th>
-                            </tr>
-                        </thead>
-                        <tbody id="online-miners-list">
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-        <!-- 区块信息 -->
-        <div class="row">
             <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        矿池状态
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="status-item">
+                                    <h5>总算力</h5>
+                                    <p id="total-hashrate">0 H/s</p>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="status-item">
+                                    <h5>在线矿工</h5>
+                                    <p id="active-miners">0</p>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="status-item">
+                                    <h5>XMR余额</h5>
+                                    <p id="xmr-balance">0.000000 XMR</p>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="status-item">
+                                    <h5>TARI余额</h5>
+                                    <p id="tari-balance">0.00 XTM</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 在线矿工和区块信息 -->
+        <div class="row mb-4">
+            <!-- 在线矿工 -->
+            <div class="col-md-3">
+                <div class="card">
+                    <div class="card-header">
+                        在线矿工
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>用户名</th>
+                                        <th>算力</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="online-miners-list">
+                                    <!-- 数据将通过 JavaScript 动态加载 -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 区块信息 -->
+            <div class="col-md-9">
                 <div class="card">
                     <div class="card-header">
                         区块信息
                     </div>
                     <div class="card-body">
                         <div class="table-responsive">
-                            <table class="table">
+                            <table class="table table-striped">
                                 <thead>
                                     <tr>
                                         <th>时间</th>
                                         <th>高度</th>
-                                        <th>ID</th>
                                         <th>类型</th>
                                         <th>奖励</th>
                                         <th>状态</th>
@@ -94,6 +108,39 @@
                                     <!-- 数据将通过 JavaScript 动态加载 -->
                                 </tbody>
                             </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 矿池介绍 -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        矿池介绍
+                    </div>
+                    <div class="card-body">
+                        <div class="pool-intro">
+                            <h4>关于我们</h4>
+                            <p>这是一个基于P2Pool的Tari-CPU挖矿矿池，支持XMR和TARI双挖。</p>
+                            
+                            <h4>矿池特点</h4>
+                            <ul>
+                                <li>支持XMR和TARI双挖</li>
+                                <li>低费率，高收益</li>
+                                <li>实时收益计算</li>
+                                <li>自动支付系统</li>
+                            </ul>
+                            
+                            <h4>挖矿配置</h4>
+                            <div class="config-example">
+                                <pre><code>./xmrig -o stratum+tcp://pool.example.com:3333 -u YOUR_WALLET_ADDRESS -p x</code></pre>
+                            </div>
+                            
+                            <h4>费率说明</h4>
+                            <p>矿池费率为8%，用于维护矿池运营和开发。</p>
                         </div>
                     </div>
                 </div>
