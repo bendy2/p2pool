@@ -27,7 +27,7 @@ redis_client = redis.Redis(host='localhost', port=6379, db=0, decode_responses=T
 # 加载配置文件
 def load_config():
     try:
-        with open('config.json', 'r') as f:
+        with open('../config.json', 'r') as f:
             return json.load(f)
     except Exception as e:
         logger.error(f"加载配置文件失败: {str(e)}")
@@ -106,7 +106,7 @@ def pool_status():
         
         # 获取XMR总奖励
         cur.execute("""
-            SELECT COALESCE(SUM(reward), 0) as total
+            SELECT COALESCE(SUM(rewards), 0) as total
             FROM blocks 
             WHERE type = 'xmr'
         """)
@@ -114,7 +114,7 @@ def pool_status():
 
         # 获取TARI总奖励
         cur.execute("""
-            SELECT COALESCE(SUM(reward), 0) as total
+            SELECT COALESCE(SUM(rewards), 0) as total
             FROM blocks 
             WHERE type = 'tari'
         """)
@@ -146,7 +146,7 @@ def user_info(username):
         
         # 获取用户账户信息
         cur.execute("""
-            SELECT * FROM users 
+            SELECT * FROM account 
             WHERE username = %s
         """, (username,))
         account = cur.fetchone()
@@ -156,20 +156,21 @@ def user_info(username):
         
         # 获取用户奖励历史
         cur.execute("""
-            SELECT timestamp, block_height as height, reward as amount 
-            FROM blocks 
-            WHERE username = %s 
-            ORDER BY timestamp DESC 
+            SELECT r.block_height as height, r.type, r.reward as amount, r.shares, b.time as timestamp
+            FROM rewards r
+            JOIN blocks b ON r.block_height = b.block_height
+            WHERE r.username = %s 
+            ORDER BY b.time DESC 
             LIMIT 20
         """, (username,))
         rewards = [dict(row) for row in cur.fetchall()]
         
         # 获取用户支付历史
         cur.execute("""
-            SELECT timestamp, txid, amount, status 
-            FROM payments 
+            SELECT time as timestamp, txid, amount, type
+            FROM payment 
             WHERE username = %s 
-            ORDER BY timestamp DESC 
+            ORDER BY time DESC 
             LIMIT 20
         """, (username,))
         payments = [dict(row) for row in cur.fetchall()]
@@ -182,8 +183,8 @@ def user_info(username):
         
         return jsonify({
             'username': username,
-            'balance': account['balance'],
-            'total_rewards': account['total_rewards'],
+            'xmr_balance': float(account['xmr_balance']),
+            'tari_balance': float(account['tari_balance']),
             'current_hashrate': current_hashrate,
             'rewards': rewards,
             'payments': payments
@@ -200,7 +201,7 @@ def get_blocks(chain_type):
         
         # 从数据库获取区块数据
         cur.execute("""
-            SELECT block_height as height, timestamp, reward 
+            SELECT block_height as height, time as timestamp, rewards as reward 
             FROM blocks 
             WHERE type = %s 
             ORDER BY block_height DESC 
