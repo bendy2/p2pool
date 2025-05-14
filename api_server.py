@@ -199,9 +199,31 @@ def handle_xmr_block(params):
             for key in redis_client.keys('xmr:submit:*'):
                 # 只删除前缀，保留完整的用户名
                 data = key.replace(XMR_PREFIX, '')
-                username = data.split(':')[1]
-                xmr_wallet = data.split(':')[0]
-                tari_wallet = data.split(':')[1]
+                
+                # 判断用户名长度
+                if len(data) > 50:
+                    # 如果长度超过50，使用原来的分割逻辑
+                    username = data.split(':')[1]
+                    xmr_wallet = data.split(':')[0]
+                    tari_wallet = data.split(':')[1]
+                else:
+                    # 如果长度不超过50，直接使用整个字符串作为用户名
+                    username = data
+                    xmr_wallet = ""
+                    tari_wallet = ""
+
+                # 从数据库获取用户的钱包地址
+                cur.execute("""
+                    SELECT xmr_wallet, tari_wallet 
+                    FROM account 
+                    WHERE username = %s
+                """, (username,))
+                result = cur.fetchone()
+                if result:
+                    xmr_wallet, tari_wallet = result
+                else:
+                    logger.warning(f"用户 {username} 不存在，跳过")
+                    continue
 
                 shares = int(redis_client.get(key) or 0)
                 total_shares += shares
@@ -318,7 +340,18 @@ def handle_tari_block(params):
             user_shares = {}
             for key in redis_client.keys('tari:submit:*'):
                 # 只删除前缀，保留完整的用户名
-                username = key.replace(TARI_PREFIX, '')
+                data    = key.replace(TARI_PREFIX, '')
+                                # 判断用户名长度
+                if len(data) > 50:
+                    # 如果长度超过50，使用原来的分割逻辑
+                    username = data.split(':')[1]
+                    xmr_wallet = data.split(':')[0]
+                    tari_wallet = data.split(':')[1]
+                else:
+                    # 如果长度不超过50，直接使用整个字符串作为用户名
+                    username = data
+                    xmr_wallet = ""
+                    tari_wallet = ""
                 shares = int(redis_client.get(key) or 0)
                 total_shares += shares
                 user_shares[username] = shares
