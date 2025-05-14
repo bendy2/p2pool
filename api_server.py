@@ -8,6 +8,10 @@ import os
 import psycopg2
 from psycopg2.extras import DictCursor
 import time
+import threading
+import subprocess
+import re
+from queue import Queue
 
 # 配置日志
 logging.basicConfig(
@@ -144,7 +148,7 @@ def handle_submit(params: Dict[str, Any]) -> Dict[str, Any]:
             'submit_counts': submit_counts
         }
         
-        logger.info(f"Share submitted - User: {username}, XMR submits: {submit_counts['xmr']}, TARI submits: {submit_counts['tari']}")
+        #logger.info(f"Share submitted - User: {username}, XMR submits: {submit_counts['xmr']}, TARI submits: {submit_counts['tari']}")
         
         return {
             'result': {
@@ -164,6 +168,7 @@ def handle_submit(params: Dict[str, Any]) -> Dict[str, Any]:
 
 def handle_xmr_block(params):
     """处理XMR爆块信息"""
+    logger.info(f"处理 XMR 区块 {params.get('height')} : {params.get('reward')} 信息")
     try:
         block_height = params.get('height')
         reward = params.get('reward')
@@ -171,23 +176,35 @@ def handle_xmr_block(params):
         if not block_height or not reward:
             return {'error': '缺少必要参数'}
             
-        # 1. 统计XMR链的submit总数
-        total_shares = 0
-        user_shares = {}
-        for key in redis_client.keys('xmr:submit:*'):
-            username = key.split(':')[-1]
-            shares = int(redis_client.get(key) or 0)
-            total_shares += shares
-            user_shares[username] = shares
-            
-        if total_shares == 0:
-            return {'error': '没有找到提交记录'}
-            
-        # 2. 将区块信息写入数据库
+        # 首先检查数据库中是否已存在该区块
         conn = get_db_connection()
         cur = conn.cursor()
         
         try:
+            cur.execute("SELECT COUNT(*) FROM blocks WHERE block_height = %s AND type = 'xmr'", (block_height,))
+            exists = cur.fetchone()[0] > 0
+            
+            if exists:
+                logger.info(f"XMR 区块 {block_height} 已存在于数据库中，跳过处理")
+                return {
+                    'success': True,
+                    'message': 'Block already exists in database',
+                    'block_height': block_height
+                }
+            
+            # 1. 统计XMR链的submit总数
+            total_shares = 0
+            user_shares = {}
+            for key in redis_client.keys('xmr:submit:*'):
+                username = key.split(':')[-1]
+                shares = int(redis_client.get(key) or 0)
+                total_shares += shares
+                user_shares[username] = shares
+                
+            if total_shares == 0:
+                return {'error': '没有找到提交记录'}
+                
+            # 2. 将区块信息写入数据库
             current_time = datetime.now()
             
             # 插入区块记录
@@ -257,29 +274,42 @@ def handle_xmr_block(params):
 
 def handle_tari_block(params):
     """处理TARI爆块信息"""
+    logger.info(f"处理 TARI 区块 {params.get('height')} 信息")
     try:
         block_height = params.get('height')
         
         if not block_height:
             return {'error': '缺少必要参数'}
             
-        # 1. 统计TARI链的submit总数
-        total_shares = 0
-        user_shares = {}
-        for key in redis_client.keys('tari:submit:*'):
-            username = key.split(':')[-1]
-            shares = int(redis_client.get(key) or 0)
-            total_shares += shares
-            user_shares[username] = shares
-            
-        if total_shares == 0:
-            return {'error': '没有找到提交记录'}
-            
-        # 2. 将区块信息写入数据库
+        # 首先检查数据库中是否已存在该区块
         conn = get_db_connection()
         cur = conn.cursor()
         
         try:
+            cur.execute("SELECT COUNT(*) FROM blocks WHERE block_height = %s AND type = 'tari'", (block_height,))
+            exists = cur.fetchone()[0] > 0
+            
+            if exists:
+                logger.info(f"TARI 区块 {block_height} 已存在于数据库中，跳过处理")
+                return {
+                    'success': True,
+                    'message': 'Block already exists in database',
+                    'block_height': block_height
+                }
+            
+            # 1. 统计TARI链的submit总数
+            total_shares = 0
+            user_shares = {}
+            for key in redis_client.keys('tari:submit:*'):
+                username = key.split(':')[-1]
+                shares = int(redis_client.get(key) or 0)
+                total_shares += shares
+                user_shares[username] = shares
+                
+            if total_shares == 0:
+                return {'error': '没有找到提交记录'}
+                
+            # 2. 将区块信息写入数据库
             # 从配置文件获取TARI区块奖励
             reward = config['rewards']['tari_block_reward']
             current_time = datetime.now()
@@ -660,6 +690,75 @@ def init_base_data():
 init_database()
 init_base_data()
 
+class LogMonitorThread(threading.Thread):
+    def __init__(self):
+        super().__init__()
+        self.daemon = True
+        self.running = True
+        self.log_queue = Queue()
+        self.log_file = './p2pool.log'
+        
+        # 编译正则表达式模式
+        self.xmr_block_pattern = re.compile(r'got a payout of ([\d.]+) XMR in block (\d+)')
+        self.tari_block_pattern = re.compile(r'Mined Tari block [a-f0-9]+ at height (\d+)')
+        
+    def run(self):
+        try:
+            # 打开日志文件
+            with open(self.log_file, 'r') as f:
+                # 移动到文件末尾
+                f.seek(0, 2)
+                
+                while self.running:
+                    line = f.readline()
+                    if not line:
+                        # 如果没有新内容，等待一小段时间
+                        time.sleep(0.1)
+                        continue
+                        
+                    # 将日志行放入队列
+                    self.log_queue.put(line)
+                    
+                    # 处理日志行
+                    self.process_log_line(line)
+                    
+        except Exception as e:
+            logger.error(f"日志监控线程错误: {str(e)}")
+            
+    def process_log_line(self, line):
+        try:
+            # 检查 XMR 爆块信息
+            xmr_match = self.xmr_block_pattern.search(line)
+            if xmr_match:
+                reward = float(xmr_match.group(1))
+                height = int(xmr_match.group(2))
+                logger.info(f"检测到 XMR 爆块 - 高度: {height}, 奖励: {reward}")
+                # 直接调用处理函数，让处理函数进行数据库检查
+                handle_xmr_block({'height': height, 'reward': reward})
+                return
+                
+            # 检查 TARI 爆块信息
+            tari_match = self.tari_block_pattern.search(line)
+            if tari_match:
+                height = int(tari_match.group(1))
+                logger.info(f"检测到 TARI 爆块 - 高度: {height}")
+                # 直接调用处理函数，让处理函数进行数据库检查
+                handle_tari_block({'height': height})
+                
+        except Exception as e:
+            logger.error(f"处理日志行时出错: {str(e)}")
+            
+    def stop(self):
+        self.running = False
+
+# 创建并启动日志监控线程
+log_monitor = LogMonitorThread()
+log_monitor.start()
+
 if __name__ == '__main__':
     logger.info("Starting API server...")
-    app.run(host='0.0.0.0', port=5000) 
+    try:
+        app.run(host='0.0.0.0', port=5000)
+    finally:
+        # 确保在服务器关闭时停止日志监控线程
+        log_monitor.stop() 
