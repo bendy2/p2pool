@@ -79,21 +79,6 @@ def fix_block():
                     WHERE username = %s
                 """, (old_reward, new_reward, reward['username']))
             
-            # 5. 记录操作日志
-            cursor.execute("""
-                INSERT INTO block_operations (
-                    block_id,
-                    operation_type,
-                    operation_time,
-                    details
-                ) VALUES (%s, %s, %s, %s)
-            """, (
-                'TARI-6379',
-                'FIX_REWARD',
-                datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                f"修复区块 6379 的奖励金额为 13850 XTM，用户奖励调整为 13.85 倍"
-            ))
-            
             # 提交事务
             conn.commit()
             logger.info("成功修复区块奖励")
