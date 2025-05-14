@@ -671,23 +671,32 @@ bool SideChain::add_external_block(PoolBlock& block, std::vector<hash>& missing_
 
 				// 发送用户提交信息到本地 API
 
-					// 构建JSON-RPC请求
-				char json_request[512];
-				snprintf(json_request, sizeof(json_request), 
-					//"{\"jsonrpc\":\"2.0\",\"id\":\"0\",\"method\":\"submit\",\"params\":{\"username\":\"%s\"}}", 
-					"{\"jsonrpc\":\"2.0\",\"id\":\"0\",\"method\":\"xmr_block\",\"params\":{\"height\":%lu,\"reward\":%lu}}", 
-					data.height, payout);
-				
-				// 使用 JSONRPCRequest 发送请求
-				JSONRPCRequest::call("127.0.0.1", 5000, json_request, "", "", false, "", 
-					[](const char* /*data*/, size_t /*size*/, double /*tcp_ping*/) {
-						// 忽略响应数据
-					},
-					[](const char* /*data*/, size_t /*size*/, double /*tcp_ping*/) {
-						// 忽略错误
-					}, &m_loop);
 
-
+				// 使用 CURL 发送请求
+				CURL* curl = curl_easy_init();
+				if (curl) {
+					char json_request[512];
+					snprintf(json_request, sizeof(json_request), 
+						//"{\"jsonrpc\":\"2.0\",\"id\":\"0\",\"method\":\"submit\",\"params\":{\"username\":\"%s\"}}", 
+						"{\"jsonrpc\":\"2.0\",\"id\":\"0\",\"method\":\"xmr_block\",\"params\":{\"height\":%lu,\"reward\":%lu}}", 
+						data.height, payout);
+					
+					struct curl_slist* headers = curl_slist_append(nullptr, "Content-Type: application/json");
+					curl_easy_setopt(curl, CURLOPT_URL, "http://127.0.0.1:5000/json_rpc");
+					curl_easy_setopt(curl, CURLOPT_POSTFIELDS, json_request);
+					curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+					curl_easy_setopt(curl, CURLOPT_POST, 1L);
+					curl_easy_setopt(curl, CURLOPT_TIMEOUT, 3L);
+					curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 2L);
+					
+					CURLcode res = curl_easy_perform(curl);
+					if (res != CURLE_OK) {
+						LOGWARN(4, "Failed to send side chain block info to API server: " << curl_easy_strerror(res));
+					}
+					
+					curl_slist_free_all(headers);
+					curl_easy_cleanup(curl);
+				}
 
 			}
 			else {

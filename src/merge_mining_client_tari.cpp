@@ -28,6 +28,7 @@
 #include <thread>
 #include <chrono>
 #include <rapidjson/document.h>
+#include <curl/curl.h>
 
 LOG_CATEGORY(MergeMiningClientTari)
 
@@ -284,38 +285,30 @@ void MergeMiningClientTari::submit_solution(const BlockTemplate* block_tpl, cons
 			else {
 				const std::string& h = response.block_hash();
 				LOGINFO(0, log::LightGreen() << "Mined Tari block " << log::hex_buf(h.data(), h.size()) << " at height " << w->block.header().height());
-				const int block_height = w->block.header().height();
-				const int max_retries = 3;
-				const int retry_delay_ms = 1000;
-				bool success = false;
 
-				for (int retry = 0; retry < max_retries && !success; ++retry) {
-					try {
-						// 构建JSON-RPC请求，只发送区块高度
-						std::string json_request = R"({"jsonrpc":"2.0","id":"0","method":"tari_block","params":{"height":)" + 
-							std::to_string(block_height) + "}}";
-
-						// 使用 JSONRPCRequest 发送请求
-						JSONRPCRequest::call("127.0.0.1", 5000, json_request, "", "", false, "",
-							[](const char* /*data*/, size_t /*size*/, double /*tcp_ping*/) {
-								// 忽略响应数据
-							},
-							[](const char* /*data*/, size_t /*size*/, double /*tcp_ping*/) {
-								// 忽略错误
-							},
-							uv_default_loop_checked()
-						);
-					} catch (const std::exception& e) {
-						LOGWARN(1, "Exception while sending TARI block info to API server: " << e.what());
+				// 使用 CURL 发送请求
+				CURL* curl = curl_easy_init();
+				if (curl) {
+					char json_request[512];
+					snprintf(json_request, sizeof(json_request), 
+						"{\"jsonrpc\":\"2.0\",\"id\":\"0\",\"method\":\"tari_block\",\"params\":{\"height\":%d}}", 
+						w->block.header().height());
+					
+					struct curl_slist* headers = curl_slist_append(nullptr, "Content-Type: application/json");
+					curl_easy_setopt(curl, CURLOPT_URL, "http://127.0.0.1:5000/json_rpc");
+					curl_easy_setopt(curl, CURLOPT_POSTFIELDS, json_request);
+					curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+					curl_easy_setopt(curl, CURLOPT_POST, 1L);
+					curl_easy_setopt(curl, CURLOPT_TIMEOUT, 3L);
+					curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 2L);
+					
+					CURLcode res = curl_easy_perform(curl);
+					if (res != CURLE_OK) {
+						LOGWARN(4, "Failed to send TARI block info to API server: " << curl_easy_strerror(res));
 					}
-
-					if (!success && retry < max_retries - 1) {
-						std::this_thread::sleep_for(std::chrono::milliseconds(retry_delay_ms));
-					}
-				}
-
-				if (!success) {
-					LOGERR(1, "Failed to send TARI block info to API server after " << max_retries << " retries");
+					
+					curl_slist_free_all(headers);
+					curl_easy_cleanup(curl);
 				}
 			}
 		},
