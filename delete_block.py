@@ -63,9 +63,9 @@ def mark_block_invalid(block_id):
         try:
             # 获取区块信息
             cursor.execute("""
-                SELECT type, rewards, block_height
+                SELECT type, rewards ,block_height
                 FROM blocks
-                WHERE block_id = %s
+                WHERE block_height = %s
             """, (block_id,))
             
             block_info = cursor.fetchone()
@@ -117,8 +117,8 @@ def mark_block_invalid(block_id):
                 UPDATE blocks
                 SET is_valid = FALSE,
                     rewards = 0
-                WHERE block_id = %s
-            """, (block_id,))
+                WHERE block_height = %s
+            """, (block_height,))
             
             # 提交事务
             conn.commit()
