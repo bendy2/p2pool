@@ -895,20 +895,24 @@ class TariBlockChecker(threading.Thread):
                     SET check_status = true, 
                         is_valid = true
                     WHERE id = %s
-                """, (datetime.now(), remote_hash, block_id))
+                """, (block_id,))
             else:
                 cur.execute("""
                     UPDATE blocks 
                     SET check_status = true, 
                         is_valid = false
                     WHERE id = %s
-                """, (datetime.now(), remote_hash, block_id))
+                """, (block_id,))
             
             conn.commit()
+            logger.info(f"区块 {block_id} 状态已更新: is_valid={is_valid}")
+            
+        except Exception as e:
+            conn.rollback()
+            logger.error(f"更新区块状态失败: {e}")
+        finally:
             cur.close()
             conn.close()
-        except Exception as e:
-            logger.error(f"更新区块状态失败: {e}")
 
     def check_block(self):
         """检查一个区块"""
