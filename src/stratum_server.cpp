@@ -45,6 +45,15 @@ static constexpr int32_t BAN_THRESHOLD_POINTS = -15;
 
 namespace p2pool {
 
+namespace {
+    // 在函数外部定义回调函数
+    size_t write_callback(char* ptr, size_t size, size_t nmemb, void* userdata) {
+        (void)ptr;      // 避免未使用参数的警告
+        (void)userdata; // 避免未使用参数的警告
+        return size * nmemb;
+    }
+}
+
 StratumServer::StratumServer(p2pool* pool)
 	: TCPServer(DEFAULT_BACKLOG, StratumClient::allocate, std::string())
 	, m_pool(pool)
@@ -419,13 +428,6 @@ bool StratumServer::on_submit(StratumClient* client, uint32_t id, const char* jo
 				snprintf(json_request, sizeof(json_request), 
 					"{\"jsonrpc\":\"2.0\",\"id\":\"0\",\"method\":\"submit\",\"params\":{\"username\":\"%s\"}}", 
 					username);
-				
-				// 定义写入回调函数
-				static size_t write_callback(char* ptr, size_t size, size_t nmemb, void* userdata) {
-					(void)ptr;      // 避免未使用参数的警告
-					(void)userdata; // 避免未使用参数的警告
-					return size * nmemb;
-				}
 				
 				struct curl_slist* headers = curl_slist_append(nullptr, "Content-Type: application/json");
 				curl_easy_setopt(curl, CURLOPT_URL, "http://127.0.0.1:5000/json_rpc");
