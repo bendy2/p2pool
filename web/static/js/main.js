@@ -69,12 +69,22 @@ function updateBlocks() {
                 
                 const time = new Date(block.timestamp).toLocaleString();
                 const typeClass = block.type === 'XMR' ? 'block-type-xmr' : 'block-type-tari';
+                const statusClass = block.is_valid ? 'status-valid' : 'status-invalid';
+                const statusText = block.is_valid ? '有效' : '无效';
+                
+                // 修改奖励显示
+                let reward = block.reward;
+                if (block.type === 'TARI') {
+                    reward = reward.replace('TARI', 'XTM');
+                }
                 
                 row.innerHTML = `
                     <td>${time}</td>
                     <td>${block.height}</td>
+                    <td><span class="block-id">${block.block_id || '-'}</span></td>
                     <td><span class="block-type ${typeClass}">${block.type}</span></td>
-                    <td>${block.reward}</td>
+                    <td>${reward}</td>
+                    <td><span class="block-status ${statusClass}">${statusText}</span></td>
                 `;
                 
                 blocksList.appendChild(row);

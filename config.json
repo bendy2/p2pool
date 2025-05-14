@@ -1,10 +1,10 @@
 {
     "pool_fees": {
-        "xmr_fee": 0.01,
-        "tari_fee": 0.01
+        "xmr_fee": 0.05,
+        "tari_fee": 0.05
     },
     "rewards": {
-        "tari_block_reward": 1000
+        "tari_block_reward": 13850
     },
     "database": {
         "host": "localhost",

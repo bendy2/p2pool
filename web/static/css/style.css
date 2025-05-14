@@ -55,6 +55,29 @@ body {
     margin-bottom: 0;
 }
 
+.block-id {
+    font-family: monospace;
+    font-size: 0.875rem;
+    color: #6c757d;
+}
+
+.block-status {
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.status-valid {
+    background-color: #28a745;
+    color: #fff;
+}
+
+.status-invalid {
+    background-color: #dc3545;
+    color: #fff;
+}
+
 /* 区块类型颜色 */
 .block-xmr {
     background-color: rgba(255, 193, 7, 0.1);
