@@ -232,18 +232,30 @@ def handle_xmr_block(params):
                         ON CONFLICT (username) DO NOTHING
                     """, (username,))
                     
-                    # 插入奖励记录
+                    # 检查是否已存在该用户的奖励记录
                     cur.execute("""
-                        INSERT INTO rewards (block_height, type, username, reward, shares)
-                        VALUES (%s, 'xmr', %s, %s, %s)
-                    """, (block_height, username, user_reward, shares))
+                        SELECT COUNT(*) 
+                        FROM rewards 
+                        WHERE block_height = %s 
+                        AND type = 'xmr' 
+                        AND username = %s
+                    """, (block_height, username))
                     
-                    # 更新用户余额
-                    cur.execute("""
-                        UPDATE account 
-                        SET xmr_balance = xmr_balance + %s
-                        WHERE username = %s
-                    """, (user_reward, username))
+                    if cur.fetchone()[0] == 0:
+                        # 插入奖励记录
+                        cur.execute("""
+                            INSERT INTO rewards (block_height, type, username, reward, shares)
+                            VALUES (%s, 'xmr', %s, %s, %s)
+                        """, (block_height, username, user_reward, shares))
+                        
+                        # 更新用户余额
+                        cur.execute("""
+                            UPDATE account 
+                            SET xmr_balance = xmr_balance + %s
+                            WHERE username = %s
+                        """, (user_reward, username))
+                    else:
+                        logger.info(f"用户 {username} 的 XMR 区块 {block_height} 奖励记录已存在，跳过")
             
             conn.commit()
             
@@ -339,18 +351,30 @@ def handle_tari_block(params):
                         ON CONFLICT (username) DO NOTHING
                     """, (username,))
                     
-                    # 插入奖励记录
+                    # 检查是否已存在该用户的奖励记录
                     cur.execute("""
-                        INSERT INTO rewards (block_height, type, username, reward, shares)
-                        VALUES (%s, 'tari', %s, %s, %s)
-                    """, (block_height, username, user_reward, shares))
+                        SELECT COUNT(*) 
+                        FROM rewards 
+                        WHERE block_height = %s 
+                        AND type = 'tari' 
+                        AND username = %s
+                    """, (block_height, username))
                     
-                    # 更新用户余额
-                    cur.execute("""
-                        UPDATE account 
-                        SET tari_balance = tari_balance + %s
-                        WHERE username = %s
-                    """, (user_reward, username))
+                    if cur.fetchone()[0] == 0:
+                        # 插入奖励记录
+                        cur.execute("""
+                            INSERT INTO rewards (block_height, type, username, reward, shares)
+                            VALUES (%s, 'tari', %s, %s, %s)
+                        """, (block_height, username, user_reward, shares))
+                        
+                        # 更新用户余额
+                        cur.execute("""
+                            UPDATE account 
+                            SET tari_balance = tari_balance + %s
+                            WHERE username = %s
+                        """, (user_reward, username))
+                    else:
+                        logger.info(f"用户 {username} 的 TARI 区块 {block_height} 奖励记录已存在，跳过")
             
             conn.commit()
             
