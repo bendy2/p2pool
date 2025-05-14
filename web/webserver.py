@@ -1,4 +1,4 @@
-from flask import Flask, render_template, jsonify
+from flask import Flask, render_template, jsonify, request, redirect, url_for
 import redis
 import sqlite3
 from datetime import datetime
@@ -23,19 +23,47 @@ def read_stratum_data():
             return {
                 'hashrate_15m': data.get('hashrate_15m', 0),
                 'hashrate_1h': data.get('hashrate_1h', 0),
-                'hashrate_24h': data.get('hashrate_24h', 0)
+                'hashrate_24h': data.get('hashrate_24h', 0),
+                'workers': data.get('workers', [])
             }
     except Exception as e:
         print(f"读取stratum数据失败: {str(e)}")
         return {
             'hashrate_15m': 0,
             'hashrate_1h': 0,
-            'hashrate_24h': 0
+            'hashrate_24h': 0,
+            'workers': []
         }
+
+def get_user_hashrate(username):
+    stratum_data = read_stratum_data()
+    total_hashrate = 0
+    
+    for worker in stratum_data['workers']:
+        try:
+            # 解析worker数据: "IP:PORT,HASHRATE,SHARES,DIFFICULTY,USERNAME"
+            parts = worker.split(',')
+            if len(parts) >= 5 and parts[4] == username:
+                total_hashrate += int(parts[1])
+        except:
+            continue
+    
+    return total_hashrate
 
 @app.route('/')
 def index():
     return render_template('index.html')
+
+@app.route('/u/')
+def user_search():
+    username = request.args.get('username')
+    if username:
+        return redirect(url_for('user_page', username=username))
+    return redirect(url_for('index'))
+
+@app.route('/u/<username>')
+def user_page(username):
+    return render_template('user.html', username=username)
 
 @app.route('/api/pool_status')
 def pool_status():
@@ -53,6 +81,55 @@ def pool_status():
             'hashrate_24h': stratum_data['hashrate_24h'],
             'active_miners': int(active_miners),
             'total_rewards': float(total_rewards)
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/user/<username>')
+def user_info(username):
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # 获取用户账户信息
+        cursor.execute('SELECT * FROM account WHERE username = ?', (username,))
+        account = cursor.fetchone()
+        
+        if not account:
+            return jsonify({'error': '用户不存在'}), 404
+        
+        # 获取用户奖励历史
+        cursor.execute('''
+            SELECT timestamp, height, amount 
+            FROM reward 
+            WHERE username = ? 
+            ORDER BY timestamp DESC 
+            LIMIT 20
+        ''', (username,))
+        rewards = [dict(row) for row in cursor.fetchall()]
+        
+        # 获取用户支付历史
+        cursor.execute('''
+            SELECT timestamp, txid, amount, status 
+            FROM payment 
+            WHERE username = ? 
+            ORDER BY timestamp DESC 
+            LIMIT 20
+        ''', (username,))
+        payments = [dict(row) for row in cursor.fetchall()]
+        
+        # 获取用户当前算力
+        current_hashrate = get_user_hashrate(username)
+        
+        conn.close()
+        
+        return jsonify({
+            'username': username,
+            'balance': account['balance'],
+            'total_rewards': account['total_rewards'],
+            'current_hashrate': current_hashrate,
+            'rewards': rewards,
+            'payments': payments
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
