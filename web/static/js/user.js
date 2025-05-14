@@ -3,9 +3,20 @@ function formatNumber(num) {
     return new Intl.NumberFormat('zh-CN').format(num);
 }
 
-// 格式化时间
+// 格式化时间（北京时间）
 function formatTime(timestamp) {
-    return new Date(timestamp * 1000).toLocaleString('zh-CN');
+    const date = new Date(timestamp * 1000);
+    // 转换为北京时间（UTC+8）
+    const beijingTime = new Date(date.getTime() + 8 * 60 * 60 * 1000);
+    return beijingTime.toLocaleString('zh-CN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+    });
 }
 
 // 格式化XMR金额
