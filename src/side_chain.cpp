@@ -63,9 +63,9 @@ NetworkType SideChain::s_networkType = NetworkType::Invalid;
 
 SideChain::SideChain(p2pool* pool, NetworkType type, const char* pool_name)
 	: m_pool(pool)
-	, m_poolName(pool_name ? pool_name : "default")
 	, m_chainTip{ nullptr }
 	, m_seenWalletsLastPruneTime(0)
+	, m_poolName(pool_name ? pool_name : "default")
 	, m_targetBlockTime(10)
 	, m_minDifficulty(MIN_DIFFICULTY, 0)
 	, m_chainWindowSize(2160)
