@@ -16,6 +16,7 @@ body {
 .table th {
     font-weight: 500;
     color: #6c757d;
+    background-color: #f8f9fa;
 }
 
 #current-hashrate, #active-miners, #total-rewards {
@@ -31,4 +32,52 @@ body {
 
 .table td {
     vertical-align: middle;
+}
+
+.status-item {
+    text-align: center;
+    padding: 15px;
+    border-radius: 8px;
+    background-color: #f8f9fa;
+    margin-bottom: 10px;
+}
+
+.status-item h5 {
+    color: #6c757d;
+    margin-bottom: 10px;
+    font-size: 1rem;
+}
+
+.status-item p {
+    color: #212529;
+    font-size: 1.25rem;
+    font-weight: 500;
+    margin-bottom: 0;
+}
+
+/* 区块类型颜色 */
+.block-xmr {
+    background-color: rgba(255, 193, 7, 0.1);
+}
+
+.block-tari {
+    background-color: rgba(13, 110, 253, 0.1);
+}
+
+/* 区块类型标签 */
+.block-type {
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.block-type-xmr {
+    background-color: #ffc107;
+    color: #000;
+}
+
+.block-type-tari {
+    background-color: #0d6efd;
+    color: #fff;
 } 

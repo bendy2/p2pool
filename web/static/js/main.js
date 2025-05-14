@@ -55,70 +55,50 @@ function formatHashrate(hashrate) {
     }
 }
 
-// 更新矿池状态
-async function updatePoolStatus() {
-    try {
-        const response = await fetch('/api/pool_status');
-        const data = await response.json();
-        
-        if (data.error) {
-            console.error('获取矿池状态失败:', data.error);
-            return;
-        }
-
-        document.getElementById('hashrate-15m').textContent = formatHashrate(data.hashrate_15m);
-        document.getElementById('hashrate-1h').textContent = formatHashrate(data.hashrate_1h);
-        document.getElementById('hashrate-24h').textContent = formatHashrate(data.hashrate_24h);
-        document.getElementById('active-miners').textContent = formatNumber(data.active_miners);
-        document.getElementById('total-rewards-xmr').textContent = formatXMR(data.total_rewards_xmr);
-        document.getElementById('total-rewards-tari').textContent = formatTARI(data.total_rewards_tari);
-    } catch (error) {
-        console.error('获取矿池状态失败:', error);
-    }
+// 更新区块列表
+function updateBlocks() {
+    fetch('/api/blocks')
+        .then(response => response.json())
+        .then(data => {
+            const blocksList = document.getElementById('blocks-list');
+            blocksList.innerHTML = '';
+            
+            data.forEach(block => {
+                const row = document.createElement('tr');
+                row.className = block.type === 'XMR' ? 'block-xmr' : 'block-tari';
+                
+                const time = new Date(block.timestamp).toLocaleString();
+                const typeClass = block.type === 'XMR' ? 'block-type-xmr' : 'block-type-tari';
+                
+                row.innerHTML = `
+                    <td>${time}</td>
+                    <td>${block.height}</td>
+                    <td><span class="block-type ${typeClass}">${block.type}</span></td>
+                    <td>${block.reward}</td>
+                `;
+                
+                blocksList.appendChild(row);
+            });
+        })
+        .catch(error => console.error('获取区块数据失败:', error));
 }
 
-// 更新区块列表
-async function updateBlocks(type) {
-    try {
-        const response = await fetch(`/api/blocks/${type}`);
-        const data = await response.json();
-        
-        if (data.error) {
-            console.error(`获取${type}区块列表失败:`, data.error);
-            return;
-        }
-
-        const tbody = document.getElementById(`${type}-blocks`);
-        tbody.innerHTML = '';
-        
-        data.blocks.forEach(block => {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td>${formatNumber(block.height)}</td>
-                <td>${formatTime(block.timestamp)}</td>
-                <td>${type === 'xmr' ? formatXMR(block.reward) : formatTARI(block.reward)}</td>
-            `;
-            tbody.appendChild(tr);
-        });
-    } catch (error) {
-        console.error(`获取${type}区块列表失败:`, error);
-    }
+// 更新矿池状态
+function updatePoolStatus() {
+    fetch('/api/pool_status')
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('total-hashrate').textContent = data.total_hashrate;
+            document.getElementById('xmr-balance').textContent = data.xmr_balance;
+            document.getElementById('tari-balance').textContent = data.tari_balance;
+        })
+        .catch(error => console.error('获取矿池状态失败:', error));
 }
 
 // 定期更新数据
-function startUpdates() {
-    // 立即更新一次
-    updatePoolStatus();
-    updateBlocks('xmr');
-    updateBlocks('tari');
+setInterval(updateBlocks, 10000);
+setInterval(updatePoolStatus, 10000);
 
-    // 每10秒更新一次
-    setInterval(() => {
-        updatePoolStatus();
-        updateBlocks('xmr');
-        updateBlocks('tari');
-    }, 10000);
-}
-
-// 页面加载完成后开始更新
-document.addEventListener('DOMContentLoaded', startUpdates); 
+// 页面加载时立即更新一次
+updateBlocks();
+updatePoolStatus(); 

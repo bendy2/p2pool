@@ -21,96 +21,61 @@
     </nav>
 
     <div class="container mt-4">
-        <div class="row">
-            <!-- 矿池状态 -->
-            <div class="row mb-4">
-                <div class="col-12">
-                    <div class="card">
-                        <div class="card-header">
-                            矿池状态
-                        </div>
-                        <div class="card-body">
-                            <div class="row">
-                                <div class="col-md-3">
-                                    <div class="status-item">
-                                        <h5>活跃矿工</h5>
-                                        <p id="active-miners">加载中...</p>
-                                    </div>
+        <!-- 矿池状态 -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        矿池状态
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="status-item">
+                                    <h5>总算力</h5>
+                                    <p id="total-hashrate">加载中...</p>
                                 </div>
-                                <div class="col-md-3">
-                                    <div class="status-item">
-                                        <h5>总算力</h5>
-                                        <p id="total-hashrate">加载中...</p>
-                                    </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="status-item">
+                                    <h5>XMR 余额</h5>
+                                    <p id="xmr-balance">加载中...</p>
                                 </div>
-                                <div class="col-md-3">
-                                    <div class="status-item">
-                                        <h5>XMR 余额</h5>
-                                        <p id="xmr-balance">加载中...</p>
-                                    </div>
-                                </div>
-                                <div class="col-md-3">
-                                    <div class="status-item">
-                                        <h5>TARI 余额</h5>
-                                        <p id="tari-balance">加载中...</p>
-                                    </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="status-item">
+                                    <h5>TARI 余额</h5>
+                                    <p id="tari-balance">加载中...</p>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
+        </div>
 
-            <!-- 区块信息和用户列表 -->
-            <div class="row">
-                <!-- 区块信息 -->
-                <div class="col-md-6">
-                    <div class="card">
-                        <div class="card-header">
-                            区块信息
-                        </div>
-                        <div class="card-body">
-                            <div class="table-responsive">
-                                <table class="table table-striped">
-                                    <thead>
-                                        <tr>
-                                            <th>时间</th>
-                                            <th>高度</th>
-                                            <th>类型</th>
-                                            <th>奖励</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="blocks-list">
-                                        <!-- 数据将通过 JavaScript 动态加载 -->
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
+        <!-- 区块信息 -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        区块信息
                     </div>
-                </div>
-
-                <!-- 用户列表 -->
-                <div class="col-md-6">
-                    <div class="card">
-                        <div class="card-header">
-                            用户列表
-                        </div>
-                        <div class="card-body">
-                            <div class="table-responsive">
-                                <table class="table table-striped">
-                                    <thead>
-                                        <tr>
-                                            <th>用户名</th>
-                                            <th>算力</th>
-                                            <th>XMR 余额</th>
-                                            <th>TARI 余额</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="users-list">
-                                        <!-- 数据将通过 JavaScript 动态加载 -->
-                                    </tbody>
-                                </table>
-                            </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>时间</th>
+                                        <th>高度</th>
+                                        <th>类型</th>
+                                        <th>奖励</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="blocks-list">
+                                    <!-- 数据将通过 JavaScript 动态加载 -->
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </div>
