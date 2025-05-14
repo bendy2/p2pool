@@ -828,9 +828,29 @@ class TariBlockChecker(threading.Thread):
             url = self.api_url.format(height=height)
             response = requests.get(url, timeout=10)
             response.raise_for_status()
-            return response.json()
+            
+            # 检查响应内容类型
+            content_type = response.headers.get('content-type', '')
+            if 'application/json' not in content_type:
+                logger.warning(f"API 响应不是 JSON 格式: {content_type}")
+                return None
+                
+            # 尝试解析 JSON
+            try:
+                data = response.json()
+                if not data:
+                    logger.warning(f"API 返回空数据: {response.text[:100]}")
+                    return None
+                return data
+            except json.JSONDecodeError as e:
+                logger.warning(f"JSON 解析错误: {e}, 响应内容: {response.text[:100]}")
+                return None
+                
         except requests.exceptions.RequestException as e:
             logger.warning(f"获取区块 {height} 数据失败: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"处理 API 响应时发生未知错误: {e}")
             return None
 
     def get_unchecked_block(self):
