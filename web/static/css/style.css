@@ -109,4 +109,38 @@ body {
 .status-pending {
     background-color: #ffc107;
     color: #000;
+}
+
+.wallet-address {
+    font-family: monospace;
+    font-size: 0.875rem;
+    color: #6c757d;
+    word-break: break-all;
+}
+
+.copy-btn {
+    margin-left: 8px;
+    padding: 2px 8px;
+    font-size: 0.75rem;
+}
+
+.balance-item {
+    text-align: center;
+    padding: 15px;
+    border-radius: 8px;
+    background-color: #f8f9fa;
+    margin-bottom: 10px;
+}
+
+.balance-item h5 {
+    color: #6c757d;
+    margin-bottom: 10px;
+    font-size: 1rem;
+}
+
+.balance-item p {
+    color: #212529;
+    font-size: 1.25rem;
+    font-weight: 500;
+    margin-bottom: 0;
 } 

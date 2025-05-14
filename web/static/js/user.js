@@ -57,64 +57,63 @@ function formatHashrate(hashrate) {
 }
 
 // 更新用户信息
-async function updateUserInfo() {
-    try {
-        // 从URL路径获取用户名
-        const username = window.location.pathname.split('/').pop();
-        const response = await fetch(`/api/user/${username}`);
-        const data = await response.json();
-        
-        if (data.error) {
-            console.error('获取用户信息失败:', data.error);
-            return;
-        }
-
-        // 更新用户信息
-        document.getElementById('current-hashrate').textContent = formatHashrate(data.current_hashrate);
-        document.getElementById('xmr-balance').textContent = formatXMR(data.xmr_balance);
-        document.getElementById('tari-balance').textContent = formatTARI(data.tari_balance);
-
-        // 更新奖励历史
-        const rewardsList = document.getElementById('rewards-list');
-        rewardsList.innerHTML = '';
-        data.rewards.forEach(reward => {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td>${formatTime(reward.timestamp)}</td>
-                <td>${formatNumber(reward.height)}</td>
-                <td>${reward.type.toUpperCase()}</td>
-                <td>${reward.type === 'xmr' ? formatXMR(reward.amount) : formatTARI(reward.amount)}</td>
-                <td>${formatNumber(reward.shares)}</td>
-            `;
-            rewardsList.appendChild(tr);
-        });
-
-        // 更新支付历史
-        const paymentsList = document.getElementById('payments-list');
-        paymentsList.innerHTML = '';
-        data.payments.forEach(payment => {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td>${formatTime(payment.timestamp)}</td>
-                <td>${payment.txid}</td>
-                <td>${payment.type.toUpperCase()}</td>
-                <td>${payment.type === 'xmr' ? formatXMR(payment.amount) : formatTARI(payment.amount)}</td>
-            `;
-            paymentsList.appendChild(tr);
-        });
-    } catch (error) {
-        console.error('获取用户信息失败:', error);
-    }
+function updateUserInfo() {
+    const username = document.getElementById('username').textContent;
+    
+    fetch(`/api/user/${username}`)
+        .then(response => response.json())
+        .then(data => {
+            // 更新基本信息
+            document.getElementById('username').textContent = data.username;
+            document.getElementById('created-at').textContent = new Date(data.created_at).toLocaleString('zh-CN');
+            document.getElementById('current-hashrate').textContent = formatHashrate(data.current_hashrate);
+            
+            // 更新钱包地址
+            document.getElementById('xmr-wallet').textContent = data.xmr_wallet || '未设置';
+            document.getElementById('tari-wallet').textContent = data.tari_wallet || '未设置';
+            
+            // 更新余额
+            document.getElementById('xmr-balance').textContent = formatXMR(data.xmr_balance);
+            document.getElementById('tari-balance').textContent = formatTARI(data.tari_balance);
+            
+            // 更新奖励历史
+            updateRewardsHistory(data.rewards);
+            
+            // 更新支付历史
+            updatePaymentsHistory(data.payments);
+        })
+        .catch(error => console.error('获取用户信息失败:', error));
 }
 
-// 定期更新数据
-function startUpdates() {
-    // 立即更新一次
+// 初始化复制按钮
+document.addEventListener('DOMContentLoaded', function() {
+    // 为所有复制按钮添加点击事件
+    document.querySelectorAll('.copy-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const targetId = this.getAttribute('data-clipboard-target');
+            const text = document.querySelector(targetId).textContent;
+            
+            // 复制到剪贴板
+            navigator.clipboard.writeText(text).then(() => {
+                // 显示复制成功提示
+                const originalText = this.textContent;
+                this.textContent = '已复制';
+                this.classList.remove('btn-outline-primary');
+                this.classList.add('btn-success');
+                
+                // 2秒后恢复按钮状态
+                setTimeout(() => {
+                    this.textContent = originalText;
+                    this.classList.remove('btn-success');
+                    this.classList.add('btn-outline-primary');
+                }, 2000);
+            }).catch(err => {
+                console.error('复制失败:', err);
+            });
+        });
+    });
+    
+    // 开始定期更新
     updateUserInfo();
-
-    // 每10秒更新一次
     setInterval(updateUserInfo, 10000);
-}
-
-// 页面加载完成后开始更新
-document.addEventListener('DOMContentLoaded', startUpdates); 
+}); 

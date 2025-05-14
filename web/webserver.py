@@ -92,20 +92,20 @@ def get_active_miners():
             data = json.load(f)
             workers = data.get('workers', [])
             
-            # 统计不同IP的矿工数
-            unique_ips = set()
+            # 统计不同用户名的矿工数
+            unique_users = set()
             for worker in workers:
                 try:
                     # 解析worker数据: "IP:PORT,HASHRATE,SHARES,DIFFICULTY,USERNAME"
                     parts = worker.split(',')
                     if len(parts) >= 5:
-                        ip = parts[0].split(':')[0]  # 只取IP部分
-                        unique_ips.add(ip)
+                        username = parts[4]  # 获取用户名
+                        unique_users.add(username)
                 except:
                     continue
             
             # 更新缓存，设置10秒过期
-            count = len(unique_ips)
+            count = len(unique_users)
             redis_client.setex('cached:active_miners', 10, count)
             return count
     except Exception as e:
@@ -158,6 +158,22 @@ def pool_status():
 
         # 从stratum文件读取算力数据
         stratum_data = read_stratum_data()
+        
+        # 获取在线矿工列表
+        online_miners = []
+        for worker in stratum_data['workers']:
+            try:
+                parts = worker.split(',')
+                if len(parts) >= 5:
+                    username = parts[4]
+                    hashrate = float(parts[1])
+                    if username not in [m['username'] for m in online_miners]:
+                        online_miners.append({
+                            'username': username,
+                            'hashrate': hashrate
+                        })
+            except:
+                continue
 
         return jsonify({
             'hashrate_15m': stratum_data['hashrate_15m'],
@@ -165,7 +181,8 @@ def pool_status():
             'hashrate_24h': stratum_data['hashrate_24h'],
             'active_miners': active_miners,
             'total_rewards_xmr': total_rewards_xmr,
-            'total_rewards_tari': total_rewards_tari
+            'total_rewards_tari': total_rewards_tari,
+            'online_miners': online_miners
         })
     except Exception as e:
         logger.error(f"获取矿池状态失败: {str(e)}")
@@ -179,7 +196,7 @@ def user_info(username):
         
         # 获取用户账户信息
         cur.execute("""
-            SELECT username, xmr_balance, tari_balance, created_at
+            SELECT username, xmr_balance, tari_balance, created_at, xmr_wallet, tari_wallet
             FROM account 
             WHERE username = %s
         """, (username,))
@@ -241,6 +258,8 @@ def user_info(username):
             'tari_balance': float(account['tari_balance']),
             'created_at': account['created_at'].isoformat(),
             'current_hashrate': current_hashrate,
+            'xmr_wallet': account['xmr_wallet'],
+            'tari_wallet': account['tari_wallet'],
             'rewards': rewards,
             'payments': payments
         })

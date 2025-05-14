@@ -146,8 +146,22 @@ function updatePoolStatus() {
 
             // 更新显示
             document.getElementById('total-hashrate').textContent = formatHashrate(data.hashrate_15m);
+            document.getElementById('active-miners').textContent = data.active_miners;
             document.getElementById('xmr-balance').textContent = formatBalance(data.total_rewards_xmr, 'XMR');
             document.getElementById('tari-balance').textContent = formatBalance(data.total_rewards_tari, 'TARI');
+
+            // 更新在线矿工列表
+            const minersList = document.getElementById('online-miners-list');
+            minersList.innerHTML = '';
+            
+            data.online_miners.forEach(miner => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td><a href="/u/${miner.username}">${miner.username}</a></td>
+                    <td>${formatHashrate(miner.hashrate)}</td>
+                `;
+                minersList.appendChild(row);
+            });
         })
         .catch(error => console.error('获取矿池状态失败:', error));
 }

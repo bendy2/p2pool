@@ -22,25 +22,77 @@
 
     <div class="container mt-4">
         <div class="row">
-            <!-- 用户基本信息 -->
+            <!-- 用户信息 -->
             <div class="col-md-4">
-                <div class="card">
+                <div class="card mb-4">
                     <div class="card-header">
                         用户信息
                     </div>
                     <div class="card-body">
-                        <div class="mb-3">
-                            <h5>用户名</h5>
-                            <p>{{ username }}</p>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h5>基本信息</h5>
+                                <table class="table">
+                                    <tr>
+                                        <th>用户名</th>
+                                        <td id="username"></td>
+                                    </tr>
+                                    <tr>
+                                        <th>注册时间</th>
+                                        <td id="created-at"></td>
+                                    </tr>
+                                    <tr>
+                                        <th>当前算力</th>
+                                        <td id="current-hashrate"></td>
+                                    </tr>
+                                </table>
+                            </div>
+                            <div class="col-md-6">
+                                <h5>钱包地址</h5>
+                                <table class="table">
+                                    <tr>
+                                        <th>XMR钱包</th>
+                                        <td>
+                                            <span id="xmr-wallet" class="wallet-address"></span>
+                                            <button class="btn btn-sm btn-outline-primary copy-btn" data-clipboard-target="#xmr-wallet">
+                                                复制
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <th>TARI钱包</th>
+                                        <td>
+                                            <span id="tari-wallet" class="wallet-address"></span>
+                                            <button class="btn btn-sm btn-outline-primary copy-btn" data-clipboard-target="#tari-wallet">
+                                                复制
+                                            </button>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </div>
                         </div>
-                        <div class="mb-3">
-                            <h5>当前算力</h5>
-                            <p id="current-hashrate">加载中...</p>
-                        </div>
-                        <div class="mb-3">
-                            <h5>账户余额</h5>
-                            <p id="xmr-balance">加载中...</p>
-                            <p id="tari-balance">加载中...</p>
+                    </div>
+                </div>
+
+                <!-- 余额信息 -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        余额信息
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="balance-item">
+                                    <h5>XMR余额</h5>
+                                    <p id="xmr-balance">0.000000 XMR</p>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="balance-item">
+                                    <h5>TARI余额</h5>
+                                    <p id="tari-balance">0.00 XTM</p>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
