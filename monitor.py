@@ -270,29 +270,75 @@ async def init_db():
 
 async def handle_xmr_block(block_data: Dict[str, Any]):
     """处理 XMR 区块数据"""
+    conn = None
     try:
-        async with db_pool.acquire() as conn:
+        conn = db_pool.getconn()
+        with conn.cursor() as cur:
             # 检查区块是否已存在
-            existing_block = await conn.fetchrow("""
+            cur.execute("""
                 SELECT id FROM blocks 
-                WHERE block_height = $1 AND type = 'xmr'
-            """, block_data['height'])
+                WHERE block_height = %s AND type = 'xmr'
+            """, (block_data['height'],))
             
-            if existing_block:
+            if cur.fetchone():
                 logger.info(f"XMR 区块 {block_data['height']} 已存在")
                 return
                 
             # 插入新区块
-            block_id = await conn.fetchval("""
+            cur.execute("""
                 INSERT INTO blocks (block_height, block_id, type, check_status, is_valid)
-                VALUES ($1, $2, 'xmr', true, true)
+                VALUES (%s, %s, 'xmr', true, true)
                 RETURNING id
-            """, block_data['height'], str(block_data['height']))
+            """, (block_data['height'], str(block_data['height'])))
             
-            logger.info(f"XMR 区块 {block_data['height']} 已记录")
+            # 获取插入的区块ID
+            block_id = cur.fetchone()
+            if not block_id:
+                logger.error(f"插入 XMR 区块 {block_data['height']} 失败，未返回区块ID")
+                conn.rollback()
+                return
+                
+            block_id = block_id[0]  # 获取返回的ID值
+            
+            # 获取该区块的奖励信息
+            cur.execute("""
+                SELECT username, reward, type
+                FROM rewards 
+                WHERE block_height = %s
+            """, (block_data['height'],))
+            
+            rewards = cur.fetchall()
+            if not rewards:
+                logger.warning(f"XMR 区块 {block_data['height']} 没有找到奖励记录")
+                conn.commit()
+                return
+                
+            # 更新用户余额
+            for reward in rewards:
+                username, reward_amount, reward_type = reward
+                if reward_type == 'xmr':
+                    cur.execute("""
+                        UPDATE account 
+                        SET xmr_balance = xmr_balance + %s
+                        WHERE username = %s
+                    """, (reward_amount, username))
+                elif reward_type == 'tari':
+                    cur.execute("""
+                        UPDATE account 
+                        SET tari_balance = tari_balance + %s
+                        WHERE username = %s
+                    """, (reward_amount, username))
+            
+            conn.commit()
+            logger.info(f"XMR 区块 {block_data['height']} 处理完成，区块ID: {block_id}")
             
     except Exception as e:
         logger.error(f"处理 XMR 区块时出错: {str(e)}")
+        if conn:
+            conn.rollback()
+    finally:
+        if conn:
+            db_pool.putconn(conn)
 
 async def handle_tari_block(block_data: Dict[str, Any]):
     """处理 TARI 区块数据"""
