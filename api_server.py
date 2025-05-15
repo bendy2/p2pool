@@ -68,16 +68,21 @@ REDIS_HOST = 'localhost'
 REDIS_PORT = 6379
 REDIS_DB = 0
 
-# 初始化Redis连接
+# 修改 Redis 初始化函数
 async def init_redis():
     global redis_client
-    redis_client = await aioredis.create_redis_pool(
-        'redis://localhost',
-        encoding='utf-8',
-        maxsize=10
-    )
-    await FastAPILimiter.init(redis_client)
-    logger.info("Successfully connected to Redis")
+    try:
+        # 使用新的 aioredis API
+        redis_client = await aioredis.from_url(
+            'redis://localhost',
+            encoding='utf-8',
+            max_connections=10
+        )
+        await FastAPILimiter.init(redis_client)
+        logger.info("Successfully connected to Redis")
+    except Exception as e:
+        logger.error(f"Redis connection failed: {str(e)}")
+        raise
 
 # Redis键前缀
 XMR_PREFIX = "xmr:submit:"
