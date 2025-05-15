@@ -116,7 +116,7 @@ function updateUserInfo() {
             // 更新余额
             document.getElementById('xmr-balance').textContent = formatXMR(data.xmr_balance);
             document.getElementById('tari-balance').textContent = formatTARI(data.tari_balance);
-            
+            document.getElementById('frozen-tari').textContent = formatTARI(data.frozen_tari);
             // 更新奖励历史
             updateRewardsList(data.rewards);
             

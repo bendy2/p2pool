@@ -246,6 +246,8 @@ def user_info(username):
         if not account:
             return jsonify({'error': '用户不存在'}), 404
         
+        # 计算冻结的 TARI 数量
+
         # 获取用户奖励历史
         cur.execute("""
             SELECT 
