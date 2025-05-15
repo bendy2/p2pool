@@ -110,42 +110,44 @@ def get_chain_key(username: str, chain: str) -> str:
     prefix = XMR_PREFIX if chain.lower() == 'xmr' else TARI_PREFIX
     return f"{prefix}{username}"
 
-def increment_submit_count(username: str) -> Dict[str, int]:
+async def increment_submit_count(username: str) -> Dict[str, int]:
     """同时增加用户XMR和TARI链的提交计数"""
     try:
         # 同时增加两条链的计数
         xmr_key = get_chain_key(username, 'xmr')
         tari_key = get_chain_key(username, 'tari')
         
-        xmr_count = redis_client.incr(xmr_key)
-        tari_count = redis_client.incr(tari_key)
-        
-        # 设置过期时间(30天)
-        redis_client.expire(xmr_key, 30 * 24 * 60 * 60)
-        redis_client.expire(tari_key, 30 * 24 * 60 * 60)
+        async with redis_client.pipeline(transaction=True) as pipe:
+            await pipe.incr(xmr_key)
+            await pipe.incr(tari_key)
+            await pipe.expire(xmr_key, 30 * 24 * 60 * 60)
+            await pipe.expire(tari_key, 30 * 24 * 60 * 60)
+            xmr_count, tari_count, _, _ = await pipe.execute()
         
         return {
             'xmr': xmr_count,
             'tari': tari_count
         }
-    except redis.RedisError as e:
+    except Exception as e:
         logger.error(f"Redis error while incrementing submit counts: {str(e)}")
         raise
 
-def get_submit_counts(username: str) -> Dict[str, int]:
+async def get_submit_counts(username: str) -> Dict[str, int]:
     """获取用户两条链的提交计数"""
     try:
         xmr_key = get_chain_key(username, 'xmr')
         tari_key = get_chain_key(username, 'tari')
         
-        xmr_count = int(redis_client.get(xmr_key) or 0)
-        tari_count = int(redis_client.get(tari_key) or 0)
+        async with redis_client.pipeline(transaction=True) as pipe:
+            await pipe.get(xmr_key)
+            await pipe.get(tari_key)
+            xmr_count, tari_count = await pipe.execute()
         
         return {
-            'xmr': xmr_count,
-            'tari': tari_count
+            'xmr': int(xmr_count or 0),
+            'tari': int(tari_count or 0)
         }
-    except redis.RedisError as e:
+    except Exception as e:
         logger.error(f"Redis error while getting submit counts: {str(e)}")
         raise
 
@@ -159,13 +161,16 @@ async def handle_submit(params: Dict[str, Any]):
         xmr_key = get_chain_key(username, 'xmr')
         tari_key = get_chain_key(username, 'tari')
         
-        # 使用事务处理提交
-        tr = redis_client.multi_exec()
-        tr.incr(xmr_key)
-        tr.incr(tari_key)
-        tr.expire(xmr_key, 30 * 24 * 60 * 60)
-        tr.expire(tari_key, 30 * 24 * 60 * 60)
-        xmr_count, tari_count, _, _ = await tr.execute()
+        # 使用新的 Redis API 进行事务操作
+        async with redis_client.pipeline(transaction=True) as pipe:
+            # 增加计数
+            await pipe.incr(xmr_key)
+            await pipe.incr(tari_key)
+            # 设置过期时间
+            await pipe.expire(xmr_key, 30 * 24 * 60 * 60)
+            await pipe.expire(tari_key, 30 * 24 * 60 * 60)
+            # 执行事务
+            xmr_count, tari_count, _, _ = await pipe.execute()
 
         return {
             'status': 'OK',
