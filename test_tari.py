@@ -53,16 +53,14 @@ def test_transfer(address: str, amount: float, message: str = "Test transfer"):
         # 打印转账结果
         print("\n转账结果:")
         print(f"交易ID: {response}")
-        exit()
-        # 等待并监控交易状态
         print("\n等待交易确认...")
-        
-        transaction_id=[response.results.transaction_id]
-        
+
+        txid = response.results.transaction_id
+        tx_query = { "transaction_ids": [txid] }
         
         max_attempts = 30
         for i in range(max_attempts):
-            tx_status = stub.GetTransaction(tx_query)
+            tx_status = stub.GetTransactionInfo(tx_query)
             print(f"交易状态: {tx_status.status}")
             if tx_status.status == "COMPLETED":
                 print("交易已确认!")
