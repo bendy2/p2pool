@@ -1216,8 +1216,24 @@ def get_user_payments(username):
         conn.close()
 
 # 添加定时任务来记录算力数据
+def read_stratum_data():
+    try:
+        with open('./web/api/local/stratum', 'r') as f:  # 修改路径
+            data = json.load(f)
+            return {
+                'hashrate_15m': data.get('hashrate_15m', 0),
+                'hashrate_1h': data.get('hashrate_1h', 0),
+                'hashrate_24h': data.get('hashrate_24h', 0),
+                'workers': data.get('workers', [])
+            }
+    except Exception as e:
+        logger.error(f"读取stratum数据失败: {str(e)}")
+        return None
+
 def record_hashrate():
     """记录当前算力数据"""
+    conn = None
+    cur = None
     try:
         # 从webserver获取当前算力数据
         stratum_data = read_stratum_data()
@@ -1242,8 +1258,10 @@ def record_hashrate():
     except Exception as e:
         logger.error(f"记录算力数据失败: {str(e)}")
     finally:
-        cur.close()
-        conn.close()
+        if cur:
+            cur.close()
+        if conn:
+            conn.close()
 
 # 创建定时任务线程
 class HashrateRecorder(threading.Thread):
@@ -1263,20 +1281,6 @@ class HashrateRecorder(threading.Thread):
             
     def stop(self):
         self.running = False
-
-def read_stratum_data():
-    try:
-        with open('./api/local/stratum', 'r') as f:
-            data = json.load(f)
-            return {
-                'hashrate_15m': data.get('hashrate_15m', 0),
-                'hashrate_1h': data.get('hashrate_1h', 0),
-                'hashrate_24h': data.get('hashrate_24h', 0),
-                'workers': data.get('workers', [])
-            }
-    except Exception as e:
-        logger.error(f"读取stratum数据失败: {str(e)}")
-        return None
 
 # 在 main 函数中添加检查器的启动代码
 if __name__ == '__main__':
