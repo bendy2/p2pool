@@ -15,9 +15,12 @@ import requests
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    filename='aamo333nitor.log'  # 使用不同的日志文件
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler('ssa32s.log')
+    ]
 )
-logger = logging.getLogger('monitor')  # 使用不同的日志记录器名称
+
 
 # 从配置文件加载数据库配置
 def load_config():
