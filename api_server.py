@@ -481,8 +481,7 @@ def handle_tari_block(params):
         logging.error(f"处理TARI区块信息失败: {str(e)}")
         return {'error': f'处理失败: {str(e)}'}
 
-@app.post("/json_rpc")
-@rate_limit(limit=1000, period=60)
+@app.post("/json_rpc")22
 async def handle_json_rpc(request: Dict[str, Any]):
     try:
         method = request.get('method')
