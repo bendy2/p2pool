@@ -166,86 +166,31 @@ function updatePoolStatus() {
         .catch(error => console.error('获取矿池状态失败:', error));
 }
 
-// 定期更新数据
-setInterval(updateBlocks, 10000);
-setInterval(updatePoolStatus, 10000);
-
-// 页面加载时立即更新一次
-updateBlocks();
-updatePoolStatus();
-
-// 初始化算力走势图
-function initHashrateChart() {
-    const ctx = document.getElementById('hashrateChart').getContext('2d');
-    const chart = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: [],
-            datasets: [{
-                label: '矿池算力',
-                data: [],
-                borderColor: 'rgb(54, 162, 235)',
-                tension: 0.1
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,  // 允许自定义高度
-            plugins: {
-                title: {
-                    display: true,
-                    text: '矿池算力走势图'
-                }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    title: {
-                        display: true,
-                        text: '算力 (H/s)'
-                    }
-                },
-                x: {
-                    title: {
-                        display: true,
-                        text: '时间'
-                    }
-                }
-            }
-        }
-    });
-    return chart;
-}
-
 // 更新算力走势图
-function updateHashrateChart(chart) {
+function updateHashrateChart() {
     fetch('/api/hashrate/history')
         .then(response => response.json())
         .then(data => {
-            if (data.error) {
-                console.error('获取算力历史数据失败:', data.error);
-                return;
+            const chart = echarts.getInstanceByDom(document.getElementById('hashrateChart'));
+            if (chart) {
+                const formattedData = data.history.map(item => [
+                    item.timestamp,
+                    item.hashrate
+                ]);
+                chart.setOption({
+                    series: [{
+                        data: formattedData
+                    }]
+                });
             }
-
-            const history = data.history;
-            const timestamps = history.map(h => formatTime(h.timestamp));
-            const hashrateData = history.map(h => h.hashrate);
-
-            chart.data.labels = timestamps;
-            chart.data.datasets[0].data = hashrateData;
-            chart.update();
         })
         .catch(error => console.error('更新算力走势图失败:', error));
 }
 
-// 页面加载完成后执行
-document.addEventListener('DOMContentLoaded', function() {
-    // 初始化算力走势图
-    const hashrateChart = initHashrateChart();
-    
-    // 立即更新一次数据
-    updateHashrateChart(hashrateChart);
-    
-    // 每5分钟更新一次数据
-    setInterval(() => updateHashrateChart(hashrateChart), 5 * 60 * 1000);
-}); 
+// 定期更新数据
+setInterval(updateHashrateChart, 30000);  // 每30秒更新一次
+updateHashrateChart();  // 立即更新一次
+
+// 页面加载时立即更新一次
+updateBlocks();
+updatePoolStatus(); 
