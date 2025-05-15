@@ -246,8 +246,19 @@ def user_info(username):
         if not account:
             return jsonify({'error': '用户不存在'}), 404
         
-        # 计算冻结的 TARI 数量
-
+            
+        # 计算18小时内的 TARI 冻结金额
+        cur.execute("""
+            SELECT COALESCE(SUM(reward), 0) as frozen_tari
+            FROM rewards 
+            WHERE username = %s 
+            AND type = 'tari'
+            AND time >= NOW() - INTERVAL '18 hours'
+        """, (username,))
+        frozen_result = cur.fetchone()
+        frozen_tari = float(frozen_result['frozen_tari']) if frozen_result else 0
+        
+        
         # 获取用户奖励历史
         cur.execute("""
             SELECT 
@@ -304,6 +315,7 @@ def user_info(username):
             'xmr_wallet': account['xmr_wallet'],
             'tari_wallet': account['tari_wallet'],
             'fee': float(account['fee']),
+            'frozen_tari': frozen_tari,  # 添
             'rewards': rewards,
             'payments': payments
         })
