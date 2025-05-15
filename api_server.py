@@ -946,26 +946,6 @@ class TariBlockChecker(threading.Thread):
             logger.error(f"处理 API 响应时发生未知错误: {e}")
             return None
 
-    def get_unchecked_block(self):
-        """从数据库获取一个未检查的区块"""
-        try:
-            conn = get_db_connection()
-            cur = conn.cursor()
-            cur.execute("""
-                SELECT id, block_height, block_id 
-                FROM blocks 
-                WHERE check_status = false 
-                AND type = 'tari'
-                ORDER BY block_height ASC 
-                LIMIT 1
-            """)
-            block = cur.fetchone()
-            cur.close()
-            conn.close()
-            return block
-        except Exception as e:
-            logger.error(f"获取未检查区块失败: {e}")
-            return None
 
     def update_block_status(self, block_id, is_valid, remote_hash=None):
         """更新区块状态"""
@@ -1000,10 +980,21 @@ class TariBlockChecker(threading.Thread):
 
     def check_block(self):
         """检查一个区块"""
-        block = self.get_unchecked_block()
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT id, block_height, block_id 
+            FROM blocks 
+            WHERE check_status = false 
+            AND type = 'tari'
+            ORDER BY block_height ASC 
+            LIMIT 1
+        """)
+        block = cur.fetchone()
         if not block:
             logger.info("没有需要检查的区块")
             return
+        block_hash = block[2]
 
         logger.info(f"开始检查区块 {block[1]}")  # block[1] 是 block_height
         api_data = self.get_block_from_api(block[1])
@@ -1016,7 +1007,7 @@ class TariBlockChecker(threading.Thread):
             header = api_data.get('header', {})
             remote_hash = self.buffer_to_hex(header.get('hash', {}))
             
-            if not remote_hash:
+            if not remote_hash or remote_hash != block_hash:
                 logger.warning(f"区块 {block[1]} 远程哈希无效")
                 return
 
