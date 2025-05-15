@@ -625,6 +625,8 @@ def xmr_stats():
 
 def init_database():
     """初始化数据库表结构"""
+    conn = None
+    cur = None
     try:
         conn = get_db_connection()
         cur = conn.cursor()
@@ -638,6 +640,7 @@ def init_database():
                 tari_balance DECIMAL(20,12) DEFAULT 0,
                 xmr_wallet VARCHAR(255),
                 tari_wallet VARCHAR(255),
+                fee DECIMAL(5,2) DEFAULT 0.01,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
@@ -646,11 +649,16 @@ def init_database():
         cur.execute("""
             CREATE TABLE IF NOT EXISTS blocks (
                 id SERIAL PRIMARY KEY,
-                block_height BIGINT UNIQUE NOT NULL,
+                block_height BIGINT NOT NULL,
+                block_id VARCHAR(255),
                 rewards DECIMAL(20,12) NOT NULL,
                 type VARCHAR(10) NOT NULL,
                 total_shares BIGINT NOT NULL,
-                time TIMESTAMP NOT NULL
+                time TIMESTAMP NOT NULL,
+                value DECIMAL(20,12) NOT NULL,
+                is_valid BOOLEAN DEFAULT true,
+                check_status BOOLEAN DEFAULT false,
+                UNIQUE(block_height, type)
             )
         """)
         
@@ -664,7 +672,20 @@ def init_database():
                 reward DECIMAL(20,12) NOT NULL,
                 shares BIGINT NOT NULL,
                 time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (block_height) REFERENCES blocks(block_height),
+                FOREIGN KEY (block_height, type) REFERENCES blocks(block_height, type),
+                FOREIGN KEY (username) REFERENCES account(username)
+            )
+        """)
+        
+        # 创建payments表(如果不存在)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS payments (
+                id SERIAL PRIMARY KEY,
+                username VARCHAR(255) NOT NULL,
+                tx_id VARCHAR(255) NOT NULL,
+                type VARCHAR(10) NOT NULL,
+                amount DECIMAL(20,12) NOT NULL,
+                time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (username) REFERENCES account(username)
             )
         """)
@@ -682,15 +703,20 @@ def init_database():
         logger.info("数据库表结构初始化成功")
         
     except Exception as e:
-        conn.rollback()
+        if conn:
+            conn.rollback()
         logger.error(f"数据库表结构初始化失败: {str(e)}")
         raise
     finally:
-        cur.close()
-        conn.close()
+        if cur:
+            cur.close()
+        if conn:
+            conn.close()
 
 def init_base_data():
     """初始化基础数据"""
+    conn = None
+    cur = None
     try:
         conn = get_db_connection()
         cur = conn.cursor()
@@ -713,12 +739,15 @@ def init_base_data():
             logger.info("基础数据已存在，跳过初始化")
             
     except Exception as e:
-        conn.rollback()
+        if conn:
+            conn.rollback()
         logger.error(f"基础数据初始化失败: {str(e)}")
         raise
     finally:
-        cur.close()
-        conn.close()
+        if cur:
+            cur.close()
+        if conn:
+            conn.close()
 
 # 在应用启动时初始化数据库和基础数据
 init_database()
