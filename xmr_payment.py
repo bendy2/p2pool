@@ -68,7 +68,7 @@ class XMRPayment:
                 WHERE xmr_balance >= %s 
                 AND xmr_wallet IS NOT NULL
                 ORDER BY xmr_balance DESC
-                LIMIT 20
+                LIMIT 10
             """, (self.min_payout,))
             
             pending_payments = []
