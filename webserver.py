@@ -81,4 +81,38 @@ def get_pool_status():
         })
     except Exception as e:
         logger.error(f"获取矿池状态失败: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/user/<username>/hashrate')
+def get_user_hashrate(username):
+    try:
+        # 计算用户名长度，如果超过10则取10
+        n = min(len(username), 10)
+        
+        # 获取用户算力数据
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT hashrate, last_seen
+            FROM miners
+            WHERE SUBSTR(username, -%s) = SUBSTR(?, -%s)
+            AND last_seen > datetime('now', '-5 minutes')
+        """, (n, username, n))
+        
+        result = cursor.fetchone()
+        cursor.close()
+        
+        if result:
+            hashrate, last_seen = result
+            return jsonify({
+                'hashrate': hashrate,
+                'last_seen': last_seen
+            })
+        else:
+            return jsonify({
+                'hashrate': 0,
+                'last_seen': None
+            })
+            
+    except Exception as e:
+        logger.error(f"获取用户算力失败: {str(e)}")
         return jsonify({'error': str(e)}), 500 
