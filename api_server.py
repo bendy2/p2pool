@@ -1263,6 +1263,21 @@ class HashrateRecorder(threading.Thread):
             
     def stop(self):
         self.running = False
+
+def read_stratum_data():
+    try:
+        with open('./api/local/stratum', 'r') as f:
+            data = json.load(f)
+            return {
+                'hashrate_15m': data.get('hashrate_15m', 0),
+                'hashrate_1h': data.get('hashrate_1h', 0),
+                'hashrate_24h': data.get('hashrate_24h', 0),
+                'workers': data.get('workers', [])
+            }
+    except Exception as e:
+        logger.error(f"读取stratum数据失败: {str(e)}")
+        return None
+
 # 在 main 函数中添加检查器的启动代码
 if __name__ == '__main__':
     logger.info("Starting API server...")
