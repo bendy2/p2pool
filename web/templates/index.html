@@ -169,31 +169,71 @@
         const myChart = echarts.init(chartDom);
         
         const option = {
+            title: {
+                text: '矿池算力走势',
+                left: 'center',
+                top: 0,
+                textStyle: {
+                    fontSize: 14
+                }
+            },
             grid: {
-                top: 10,
-                right: 10,
-                bottom: 20,
-                left: 40,
+                top: 30,
+                right: 20,
+                bottom: 30,
+                left: 50,
                 containLabel: true
             },
             tooltip: {
                 trigger: 'axis',
                 formatter: function(params) {
                     const data = params[0];
-                    return `${data.name}<br/>${(data.value/1000).toFixed(2)} KH/s`;
+                    const date = new Date(data.value[0]);
+                    const time = date.toLocaleTimeString('zh-CN', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit',
+                        hour12: false
+                    });
+                    return `${time}<br/>${(data.value[1]/1000).toFixed(2)} KH/s`;
                 }
             },
             xAxis: {
                 type: 'time',
                 axisLabel: {
-                    formatter: '{HH:mm}'
+                    formatter: function(value) {
+                        const date = new Date(value);
+                        return date.toLocaleTimeString('zh-CN', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            hour12: false
+                        });
+                    },
+                    interval: 'auto',
+                    rotate: 45
+                },
+                splitLine: {
+                    show: true,
+                    lineStyle: {
+                        type: 'dashed'
+                    }
                 }
             },
             yAxis: {
                 type: 'value',
+                name: '算力',
+                nameTextStyle: {
+                    padding: [0, 0, 0, 40]
+                },
                 axisLabel: {
                     formatter: function(value) {
                         return (value/1000).toFixed(0) + 'K';
+                    }
+                },
+                splitLine: {
+                    show: true,
+                    lineStyle: {
+                        type: 'dashed'
                     }
                 }
             },
@@ -203,10 +243,15 @@
                 smooth: true,
                 showSymbol: false,
                 areaStyle: {
-                    opacity: 0.1
+                    opacity: 0.1,
+                    color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                        { offset: 0, color: 'rgb(54, 162, 235)' },
+                        { offset: 1, color: 'rgba(54, 162, 235, 0.1)' }
+                    ])
                 },
                 lineStyle: {
-                    width: 2
+                    width: 2,
+                    color: 'rgb(54, 162, 235)'
                 },
                 data: []
             }]
@@ -224,7 +269,7 @@
                 const chart = echarts.getInstanceByDom(document.getElementById('hashrateChart'));
                 if (chart) {
                     const formattedData = data.history.map(item => [
-                        item.timestamp,
+                        new Date(item.timestamp).getTime(),
                         item.hashrate
                     ]);
                     chart.setOption({
@@ -243,6 +288,14 @@
     // 定期更新数据
     setInterval(updateHashrateData, 30000);  // 每30秒更新一次
     updateHashrateData();  // 立即更新一次
+
+    // 监听窗口大小变化，调整图表大小
+    window.addEventListener('resize', function() {
+        const chart = echarts.getInstanceByDom(document.getElementById('hashrateChart'));
+        if (chart) {
+            chart.resize();
+        }
+    });
     </script>
 </body>
 </html> 
