@@ -7,6 +7,8 @@ from queue import Queue
 import aiohttp
 import asyncpg
 from typing import Dict, Any
+import json
+from psycopg2 import pool
 
 # 配置日志
 logging.basicConfig(
@@ -15,14 +17,18 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# 从配置文件加载数据库配置
+def load_config():
+    try:
+        with open('config.json', 'r') as f:
+            config = json.load(f)
+            return config.get('database', {})
+    except Exception as e:
+        logger.error(f"加载配置文件失败: {str(e)}")
+        raise
+
 # 数据库配置
-DB_CONFIG = {
-    'host': 'localhost',
-    'port': 5432,
-    'user': 'postgres',
-    'password': 'postgres',
-    'database': 'p2pool'
-}
+DB_CONFIG = load_config()
 
 # 全局数据库连接池
 db_pool = None
@@ -258,11 +264,15 @@ class TariBlockChecker(threading.Thread):
         """停止检查器"""
         self.running = False
 
-async def init_db():
+def init_db():
     """初始化数据库连接池"""
     global db_pool
     try:
-        db_pool = await asyncpg.create_pool(**DB_CONFIG)
+        db_pool = pool.ThreadedConnectionPool(
+            minconn=1,
+            maxconn=10,
+            **DB_CONFIG
+        )
         logger.info("Successfully connected to database")
     except Exception as e:
         logger.error(f"Database connection failed: {str(e)}")
@@ -416,7 +426,7 @@ async def main():
     """主函数"""
     try:
         # 初始化数据库连接
-        await init_db()
+        init_db()
         
         # 创建并启动日志监控线程
         log_monitor = LogMonitorThread()
