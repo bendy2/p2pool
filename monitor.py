@@ -5,6 +5,7 @@ import threading
 import time
 import re
 from queue import Queue
+from typing import Dict, Any, List
 import aiohttp
 from datetime import datetime
 import asyncpg
@@ -54,6 +55,42 @@ async def init_db():
         return db_pool
     except Exception as e:
         logger.error(f"Database connection failed: {str(e)}")
+        raise
+# PostgreSQL数据库连接
+def get_db_connection():
+    return psycopg2.connect(
+        host=config['database']['host'],
+        port=config['database']['port'],
+        database=config['database']['database'],
+        user=config['database']['user'],
+        password=config['database']['password']
+    )
+
+def get_chain_key(username: str, chain: str) -> str:
+    """获取Redis键名"""
+    prefix = XMR_PREFIX if chain.lower() == 'xmr' else TARI_PREFIX
+    return f"{prefix}{username}"
+
+def increment_submit_count(username: str) -> Dict[str, int]:
+    """同时增加用户XMR和TARI链的提交计数"""
+    try:
+        # 同时增加两条链的计数
+        xmr_key = get_chain_key(username, 'xmr')
+        tari_key = get_chain_key(username, 'tari')
+        
+        xmr_count = redis_client.incr(xmr_key)
+        tari_count = redis_client.incr(tari_key)
+        
+        # 设置过期时间(30天)
+        redis_client.expire(xmr_key, 30 * 24 * 60 * 60)
+        redis_client.expire(tari_key, 30 * 24 * 60 * 60)
+        
+        return {
+            'xmr': xmr_count,
+            'tari': tari_count
+        }
+    except redis.RedisError as e:
+        logger.error(f"Redis error while incrementing submit counts: {str(e)}")
         raise
 
 
