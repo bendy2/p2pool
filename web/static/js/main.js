@@ -149,6 +149,8 @@ function updatePoolStatus() {
             document.getElementById('active-miners').textContent = data.active_miners;
             document.getElementById('xmr-balance').textContent = formatBalance(data.total_rewards_xmr, 'XMR');
             document.getElementById('tari-balance').textContent = formatBalance(data.total_rewards_tari, 'TARI');
+            document.getElementById('xmr-paid').textContent = formatBalance(data.total_paid_xmr, 'XMR');
+            document.getElementById('tari-paid').textContent = formatBalance(data.total_paid_tari, 'TARI');
 
             // 更新在线矿工列表
             const minersList = document.getElementById('online-miners-list');
@@ -165,6 +167,33 @@ function updatePoolStatus() {
         })
         .catch(error => console.error('获取矿池状态失败:', error));
 }
+
+
+// 格式化数字，保留指定小数位
+function formatNumber(number, decimals) {
+    return number.toFixed(decimals);
+}
+
+// 格式化算力显示
+function formatHashrate(hashrate) {
+    if (hashrate >= 1e9) {
+        return (hashrate / 1e9).toFixed(2) + ' GH/s';
+    }
+    if (hashrate >= 1e6) {
+        return (hashrate / 1e6).toFixed(2) + ' MH/s';
+    }
+    if (hashrate >= 1e3) {
+        return (hashrate / 1e3).toFixed(2) + ' KH/s';
+    }
+    return hashrate.toFixed(2) + ' H/s';
+}
+
+// 每60秒更新一次数据
+setInterval(updatePoolStatus, 60000);
+// 页面加载时立即更新一次
+document.addEventListener('DOMContentLoaded', updatePoolStatus);
+
+
 
 // 更新算力走势图
 function updateHashrateChart() {

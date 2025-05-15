@@ -161,6 +161,20 @@ def pool_status():
             WHERE type = 'tari' AND is_valid = TRUE
         """)
         total_rewards_tari = float(cur.fetchone()['total'] or 0)
+            # 获取XMR已支付金额
+        cur.execute("""
+            SELECT COALESCE(SUM(amount), 0) as total_paid
+            FROM payment 
+            WHERE type = 'xmr'
+        """)
+        total_paid_xmr = float(cur.fetchone()[0] or 0)
+        # 获取TARI已支付金额
+        cur.execute("""
+            SELECT COALESCE(SUM(amount), 0) as total_paid
+            FROM payment 
+            WHERE type = 'tari'
+        """)
+        total_paid_tari = float(cur.fetchone()[0] or 0)
 
         cur.close()
         conn.close()
@@ -207,6 +221,8 @@ def pool_status():
             'active_miners': active_miners,
             'total_rewards_xmr': total_rewards_xmr,
             'total_rewards_tari': total_rewards_tari,
+            'total_paid_xmr': total_paid_xmr,
+            'total_paid_tari': total_paid_tari,
             'online_miners': online_miners
         })
     except Exception as e:
