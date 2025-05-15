@@ -24,6 +24,7 @@ import aiofiles
 import aioredis
 from functools import lru_cache
 from aiopg.pool import create_pool
+from fastapi.logger import logger as fastapi_logger
 
 # 配置日志
 logging.basicConfig(
@@ -38,6 +39,14 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 app = FastAPI()
+
+# 设置 FastAPI 的日志级别为 WARNING
+fastapi_logger.setLevel(logging.WARNING)
+
+# 同时设置 uvicorn 的日志级别
+logging.getLogger("uvicorn").setLevel(logging.WARNING)
+logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
+logging.getLogger("uvicorn.error").setLevel(logging.WARNING)
 
 # 添加CORS中间件
 app.add_middleware(
@@ -1028,7 +1037,7 @@ if __name__ == '__main__':
         tari_checker = TariBlockChecker(config['database'])
         tari_checker.start()
         
-        # 启动 API 服务器
+        # 启动 API 服务器，添加日志配置
         uvicorn.run(
             "api_server:app",
             host="0.0.0.0",
@@ -1037,7 +1046,8 @@ if __name__ == '__main__':
             loop="uvloop",
             limit_concurrency=1000,
             backlog=2048,
-            reload=True
+            reload=True,
+            log_level="warning"  # 设置 uvicorn 的日志级别
         )
     except Exception as e:
         logger.error(f"服务器启动失败: {str(e)}")
