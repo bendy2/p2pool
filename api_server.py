@@ -196,6 +196,8 @@ def handle_xmr_block(params):
             # 1. 统计XMR链的submit总数
             total_shares = 0
             user_shares = {}
+            xmr_wallet={}
+            tari_wallet={}
             for key in redis_client.keys('xmr:submit:*'):
                 # 只删除前缀，保留完整的用户名
                 data = key.replace(XMR_PREFIX, '')
@@ -204,27 +206,35 @@ def handle_xmr_block(params):
                 if len(data) > 50:
                     # 如果长度超过50，使用原来的分割逻辑
                     username = data.split(':')[1]
-                    xmr_wallet = data.split(':')[0]
-                    tari_wallet = data.split(':')[1]
+                    xmr_wallet[username] = data.split(':')[0]
+                    tari_wallet[username] = data.split(':')[1]
                 else:
                     # 如果长度不超过50，直接使用整个字符串作为用户名
                     username = data
-                    xmr_wallet = ""
-                    tari_wallet = ""
+                    xmr_wallet[username] = ""
+                    tari_wallet[username] = ""
 
                 # 从数据库获取用户的钱包地址
                 cur.execute("""
                     SELECT xmr_wallet, tari_wallet 
                     FROM account 
-                    WHERE username = %s
+                    WHERE username = %s and xmr_wallet != ''
                 """, (username,))
                 result = cur.fetchone()
                 if result:
-                    xmr_wallet, tari_wallet = result
+                    xmr_wallet[username], tari_wallet[username] = result
                 else:
-                    xmr_wallet = ""
-                    tari_wallet = ""
-
+                    if xmr_wallet[username] != "":
+                        cur.execute("""
+                            UPDATE account 
+                            SET xmr_wallet = %s,
+                                tari_wallet = %s
+                            WHERE username = %s
+                        """, (xmr_wallet[username], tari_wallet[username], username))
+                    else:
+                        xmr_wallet[username] = ""
+                        tari_wallet[username] = "" 
+                        
                 shares = int(redis_client.get(key) or 0)
                 total_shares += shares
                 user_shares[username] = shares
@@ -256,7 +266,7 @@ def handle_xmr_block(params):
                         INSERT INTO account (username, xmr_wallet, tari_wallet, xmr_balance, tari_balance, fee)
                         VALUES (%s, %s, %s, 0, 0, %s)
                         ON CONFLICT (username) DO NOTHING
-                    """, (username, xmr_wallet, tari_wallet, fee))
+                    """, (username, xmr_wallet[username], tari_wallet[username], fee))
                     
                     # 检查是否已存在该用户的奖励记录
                     cur.execute("""
@@ -338,6 +348,8 @@ def handle_tari_block(params):
             # 1. 统计TARI链的submit总数
             total_shares = 0
             user_shares = {}
+            xmr_wallet={}
+            tari_wallet={}
             for key in redis_client.keys('tari:submit:*'):
                 # 只删除前缀，保留完整的用户名
                 data    = key.replace(TARI_PREFIX, '')
@@ -345,13 +357,35 @@ def handle_tari_block(params):
                 if len(data) > 50:
                     # 如果长度超过50，使用原来的分割逻辑
                     username = data.split(':')[1]
-                    xmr_wallet = data.split(':')[0]
-                    tari_wallet = data.split(':')[1]
+                    xmr_wallet[username] = data.split(':')[0]
+                    tari_wallet[username] = data.split(':')[1]
                 else:
                     # 如果长度不超过50，直接使用整个字符串作为用户名
                     username = data
-                    xmr_wallet = ""
-                    tari_wallet = ""
+                    xmr_wallet[username] = ""
+                    tari_wallet[username] = ""
+
+
+                cur.execute("""
+                    SELECT xmr_wallet, tari_wallet 
+                    FROM account 
+                    WHERE username = %s and xmr_wallet != ''
+                """, (username,))
+                result = cur.fetchone()
+                if result:
+                    xmr_wallet[username], tari_wallet[username] = result
+                else:
+                    if xmr_wallet[username] != "":
+                        cur.execute("""
+                            UPDATE account 
+                            SET xmr_wallet = %s,
+                                tari_wallet = %s
+                            WHERE username = %s
+                        """, (xmr_wallet[username], tari_wallet[username], username))
+                    else:
+                        xmr_wallet[username] = ""
+                        tari_wallet[username] = "" 
+                        
                 shares = int(redis_client.get(key) or 0)
                 total_shares += shares
                 user_shares[username] = shares
@@ -386,7 +420,7 @@ def handle_tari_block(params):
                         INSERT INTO account (username, xmr_wallet, tari_wallet, tari_balance, xmr_balance, fee)
                         VALUES (%s, %s, %s, 0, 0, %s)
                         ON CONFLICT (username) DO NOTHING
-                    """, (username, xmr_wallet, tari_wallet, fee))
+                    """, (username, xmr_wallet[username], tari_wallet[username], fee))
                     
                     # 检查是否已存在该用户的奖励记录
                     cur.execute("""
