@@ -81,7 +81,7 @@ def get_user_hashrate(username):
 def get_active_miners():
     # 尝试从缓存获取
     cached_count = redis_client.get('cached:active_miners')
-    if cached_count is not None:11
+    if cached_count is not None:
         return int(cached_count)
     
     try:
