@@ -16,7 +16,7 @@ import requests
 
 # 配置日志
 logging.basicConfig(
-    level=logging.DEBUG,  # 将默认日志级别改为 WARNING
+    level=logging.INFO,  # 将默认日志级别改为 WARNING
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
         logging.StreamHandler(),
