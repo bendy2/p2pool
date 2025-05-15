@@ -566,5 +566,19 @@ def main():
             logger.info("数据库连接池已关闭")
 
 if __name__ == "__main__":
+    # 设置日志格式
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        filename='monitor.log'  # 只使用文件名
+    )
+    
+    # 添加控制台输出
+    console = logging.StreamHandler()
+    console.setLevel(logging.INFO)
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    console.setFormatter(formatter)
+    logging.getLogger('').addHandler(console)
+    
     # 启动主程序
     main()
