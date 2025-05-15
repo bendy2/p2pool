@@ -140,7 +140,7 @@ class TariBlockChecker(threading.Thread):
     async def update_block_status(self, block_id, is_valid, remote_hash=None):
         """更新区块状态"""
         try:
-            async with db_pool.acquire() as conn:
+            async with db_pool.getconn() as conn:
                 if is_valid:
                     await conn.execute("""
                         UPDATE blocks 
@@ -163,7 +163,7 @@ class TariBlockChecker(threading.Thread):
 
     async def check_block(self):
         """检查一个区块"""
-        async with db_pool.acquire() as conn:
+        async with db_pool.getconn() as conn:
             block = await conn.fetchrow("""
                 SELECT id, block_height, block_id 
                 FROM blocks 
@@ -207,7 +207,7 @@ class TariBlockChecker(threading.Thread):
     async def handle_invalid_block(self, block_id, block_height):
         """处理无效区块"""
         try:
-            async with db_pool.acquire() as conn:
+            async with db_pool.getconn() as conn:
                 async with conn.transaction():
                     # 1. 更新区块状态为无效
                     await conn.execute("""
@@ -278,11 +278,11 @@ def init_db():
         logger.error(f"Database connection failed: {str(e)}")
         raise
 
-async def handle_xmr_block(block_data: Dict[str, Any]):
+def handle_xmr_block(block_data):
     """处理 XMR 区块数据"""
     conn = None
     try:
-        conn = db_pool.getconn()
+        conn = db_pool.getconn()  # 使用 getconn() 而不是 acquire()
         with conn.cursor() as cur:
             # 检查区块是否已存在
             cur.execute("""
@@ -348,13 +348,13 @@ async def handle_xmr_block(block_data: Dict[str, Any]):
             conn.rollback()
     finally:
         if conn:
-            db_pool.putconn(conn)
+            db_pool.putconn(conn)  # 使用 putconn() 而不是 release()
 
-async def handle_tari_block(block_data: Dict[str, Any]):
+def handle_tari_block(block_data):
     """处理 TARI 区块数据"""
     conn = None
     try:
-        conn = db_pool.getconn()
+        conn = db_pool.getconn()  # 使用 getconn() 而不是 acquire()
         with conn.cursor() as cur:
             # 检查区块是否已存在
             cur.execute("""
@@ -420,7 +420,7 @@ async def handle_tari_block(block_data: Dict[str, Any]):
             conn.rollback()
     finally:
         if conn:
-            db_pool.putconn(conn)
+            db_pool.putconn(conn)  # 使用 putconn() 而不是 release()
 
 async def main():
     """主函数"""
