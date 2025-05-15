@@ -755,10 +755,265 @@ async def startup():
     await init_database()
     await init_base_data()
 
+
+
+class LogMonitorThread(threading.Thread):
+    def __init__(self):
+        super().__init__()
+        self.daemon = True
+        self.running = True
+        self.log_queue = Queue()
+        self.log_file = './p2pool.log'
+        
+        # 编译正则表达式模式
+        self.xmr_block_pattern = re.compile(r'got a payout of ([\d.]+) XMR in block (\d+)')
+        self.tari_block_pattern = re.compile(r'Mined Tari block ([a-f0-9]+) at height (\d+)')
+        
+    def run(self):
+        try:
+            # 打开日志文件
+            with open(self.log_file, 'r') as f:
+                # 移动到文件末尾
+                f.seek(0, 2)
+                
+                while self.running:
+                    line = f.readline()
+                    if not line:
+                        # 如果没有新内容，等待一小段时间
+                        time.sleep(0.1)
+                        continue
+                        
+                    # 将日志行放入队列
+                    self.log_queue.put(line)
+                    
+                    # 处理日志行
+                    self.process_log_line(line)
+                    
+        except Exception as e:
+            logger.error(f"日志监控线程错误: {str(e)}")
+            
+    def process_log_line(self, line):
+        try:
+            # 检查 XMR 爆块信息
+            xmr_match = self.xmr_block_pattern.search(line)
+            if xmr_match:
+                reward = float(xmr_match.group(1))
+                height = int(xmr_match.group(2))
+                logger.info(f"检测到 XMR 爆块 - 高度: {height}, 奖励: {reward}")
+                # 直接调用处理函数，让处理函数进行数据库检查
+                asyncio.create_task(handle_xmr_block({'height': height, 'reward': reward}))
+                return
+                
+            # 检查 TARI 爆块信息
+            tari_match = self.tari_block_pattern.search(line)
+            if tari_match:
+                height = int(tari_match.group(2))
+                block_id = tari_match.group(1)
+                logger.info(f"检测到 TARI 爆块 - 高度: {height}, 区块ID: {block_id}")
+                # 直接调用处理函数，让处理函数进行数据库检查
+                asyncio.create_task(handle_tari_block({'height': height, 'block_id': block_id}))
+                
+        except Exception as e:
+            logger.error(f"处理日志行时出错: {str(e)}")
+            
+    def stop(self):
+        self.running = False
+
+class TariBlockChecker(threading.Thread):
+    def __init__(self, db_config):
+        super().__init__()
+        self.daemon = True
+        self.running = True
+        self.db_config = db_config
+        self.api_url = "https://explore.tari.com/blocks/{height}?json"
+        self.check_interval = 60  # 检查间隔（秒）
+
+    def buffer_to_hex(self, buffer_data):
+        """将 Buffer 数据转换为十六进制字符串"""
+        if not isinstance(buffer_data, dict) or 'data' not in buffer_data:
+            return ''
+        return ''.join([f'{x:02x}' for x in buffer_data['data']])
+
+    async def get_block_data(self, block_height: int) -> Dict[str, Any]:
+        """获取指定高度的区块数据"""
+        url = f'https://textexplore.tari.com/blocks/{block_height}?json'
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url) as response:
+                    response.raise_for_status()
+                    return await response.json()
+        except Exception as e:
+            logger.error(f"获取区块数据失败: {e}")
+            return None
+
+    async def get_block_from_api(self, height):
+        """从 API 获取区块数据"""
+        try:
+            url = f'https://textexplore.tari.com/blocks/{height}?json'
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, timeout=10) as response:
+                    response.raise_for_status()
+                    
+                    # 检查响应内容类型
+                    content_type = response.headers.get('content-type', '')
+                    if 'application/json' not in content_type:
+                        logger.warning(f"API 响应不是 JSON 格式: {content_type}")
+                        return None
+                        
+                    # 尝试解析 JSON
+                    try:
+                        data = await response.json()
+                        if not data:
+                            logger.warning(f"API 返回空数据: {await response.text()[:100]}")
+                            return None
+                        return data
+                    except json.JSONDecodeError as e:
+                        logger.warning(f"JSON 解析错误: {e}, 响应内容: {await response.text()[:100]}")
+                        return None
+                    
+        except Exception as e:
+            logger.error(f"处理 API 响应时发生未知错误: {e}")
+            return None
+
+    async def update_block_status(self, block_id, is_valid, remote_hash=None):
+        """更新区块状态"""
+        try:
+            async with db_pool.acquire() as conn:
+                if is_valid:
+                    await conn.execute("""
+                        UPDATE blocks 
+                        SET check_status = true, 
+                            is_valid = true
+                        WHERE id = $1
+                    """, block_id)
+                else:
+                    await conn.execute("""
+                        UPDATE blocks 
+                        SET check_status = true, 
+                            is_valid = false
+                        WHERE id = $1
+                    """, block_id)
+                
+                logger.info(f"区块 {block_id} 状态已更新: is_valid={is_valid} remote_hash={remote_hash}")
+                
+        except Exception as e:
+            logger.error(f"更新区块状态失败: {e}")
+
+    async def check_block(self):
+        """检查一个区块"""
+        async with db_pool.acquire() as conn:
+            block = await conn.fetchrow("""
+                SELECT id, block_height, block_id 
+                FROM blocks 
+                WHERE check_status = false 
+                AND type = 'tari'
+                ORDER BY block_height ASC 
+                LIMIT 1
+            """)
+            
+            if not block:
+                logger.info("没有需要检查的区块")
+                return
+                
+            block_hash = block['block_id']
+            logger.info(f"开始检查区块 {block['block_height']}")
+            
+            api_data = await self.get_block_from_api(block['block_height'])
+            
+            if not api_data:
+                logger.info(f"远程未找到区块 {block['block_height']}，跳过")
+                return
+
+            try:
+                header = api_data.get('header', {})
+                remote_hash = self.buffer_to_hex(header.get('hash', {}))
+                
+                if not remote_hash or remote_hash != block_hash:
+                    logger.warning(f"区块 {block['block_height']} 远程哈希无效")
+                    await self.handle_invalid_block(block['id'], block['block_height'])
+                    return
+
+                # 更新区块状态
+                await self.update_block_status(block['id'], True, remote_hash)
+                logger.info(f"区块 {block['block_height']} 验证成功")
+
+            except Exception as e:
+                logger.error(f"检查区块 {block['block_height']} 时发生错误: {e}")
+                # 如果发生错误，将区块标记为无效
+                await self.handle_invalid_block(block['id'], block['block_height'])
+
+    async def handle_invalid_block(self, block_id, block_height):
+        """处理无效区块"""
+        try:
+            async with db_pool.acquire() as conn:
+                async with conn.transaction():
+                    # 1. 更新区块状态为无效
+                    await conn.execute("""
+                        UPDATE blocks 
+                        SET check_status = true, 
+                            is_valid = false
+                        WHERE id = $1
+                    """, block_id)
+                    
+                    # 2. 获取该区块的所有奖励记录
+                    rewards = await conn.fetch("""
+                        SELECT username, reward, type
+                        FROM rewards 
+                        WHERE block_height = $1
+                    """, block_height)
+                    
+                    # 3. 回滚用户余额
+                    for reward in rewards:
+                        if reward['type'] == 'tari':
+                            await conn.execute("""
+                                UPDATE account 
+                                SET tari_balance = tari_balance - $1
+                                WHERE username = $2
+                            """, reward['reward'], reward['username'])
+                        elif reward['type'] == 'xmr':
+                            await conn.execute("""
+                                UPDATE account 
+                                SET xmr_balance = xmr_balance - $1
+                                WHERE username = $2
+                            """, reward['reward'], reward['username'])
+                    
+                    # 4. 删除奖励记录
+                    await conn.execute("""
+                        UPDATE rewards 
+                        SET reward = 0
+                        WHERE block_height = $1
+                    """, block_height)
+                    
+                    logger.info(f"区块 {block_height} 已标记为无效并清理相关数据")
+                    
+        except Exception as e:
+            logger.error(f"处理无效区块 {block_height} 时发生错误: {e}")
+
+    def run(self):
+        """运行检查器"""
+        while self.running:
+            try:
+                asyncio.run(self.check_block())
+            except Exception as e:
+                logger.error(f"检查器运行错误: {e}")
+            time.sleep(self.check_interval)
+
+    def stop(self):
+        """停止检查器"""
+        self.running = False
+        
+
 # 修改主函数
 if __name__ == '__main__':
     logger.info("Starting API server...")
+    log_monitor = None
+    tari_checker = None
+    
     try:
+        # 创建并启动日志监控线程
+        log_monitor = LogMonitorThread()
+        log_monitor.start()
+        
         # 启动 Tari 区块检查器
         tari_checker = TariBlockChecker(config['database'])
         tari_checker.start()
@@ -774,8 +1029,12 @@ if __name__ == '__main__':
             backlog=2048,
             reload=True
         )
+    except Exception as e:
+        logger.error(f"服务器启动失败: {str(e)}")
+        raise
     finally:
         # 确保在服务器关闭时停止所有线程
-        log_monitor.stop()
-        if 'tari_checker' in locals():
+        if log_monitor:
+            log_monitor.stop()
+        if tari_checker:
             tari_checker.stop()
