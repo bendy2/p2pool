@@ -7,40 +7,42 @@ function formatNumber(num) {
 function formatTime(utcTime) {
     if (!utcTime) return '-';
     const date = new Date(utcTime);
-    // 转换为北京时间 (UTC+8)
-    const beijingTime = new Date(date.getTime() + 8 * 60 * 60 * 1000);
-    return beijingTime.toLocaleString('zh-CN', {
+    // 直接使用 toLocaleString，它会自动处理时区转换
+    return date.toLocaleString('zh-CN', {
         year: 'numeric',
         month: '2-digit',
         day: '2-digit',
         hour: '2-digit',
         minute: '2-digit',
         second: '2-digit',
-        hour12: false
+        hour12: false,
+        timeZone: 'Asia/Shanghai'  // 指定时区为上海（北京时间）
     });
 }
 
-// 格式化XMR金额（6位小数）
+// 格式化XMR金额
 function formatXMR(amount) {
-    return parseFloat(amount).toFixed(6) + ' XMR';
+    return (parseFloat(amount) || 0).toFixed(12) + ' XMR';
 }
 
-// 格式化TARI金额（2位小数）
+// 格式化TARI金额
 function formatTARI(amount) {
-    return parseFloat(amount).toFixed(2) + ' XTM';
+    return (parseFloat(amount) || 0).toFixed(2) + ' XTM';
 }
 
 // 格式化算力
 function formatHashrate(hashrate) {
-    if (hashrate >= 1e9) {
-        return (hashrate / 1e9).toFixed(2) + ' GH/s';
-    } else if (hashrate >= 1e6) {
-        return (hashrate / 1e6).toFixed(2) + ' MH/s';
-    } else if (hashrate >= 1e3) {
-        return (hashrate / 1e3).toFixed(2) + ' KH/s';
-    } else {
-        return hashrate.toFixed(2) + ' H/s';
+    if (!hashrate) return '0 H/s';
+    const units = ['H/s', 'KH/s', 'MH/s', 'GH/s', 'TH/s'];
+    let value = parseFloat(hashrate);
+    let unitIndex = 0;
+    
+    while (value >= 1000 && unitIndex < units.length - 1) {
+        value /= 1000;
+        unitIndex++;
     }
+    
+    return value.toFixed(2) + ' ' + units[unitIndex];
 }
 
 // 格式化费率显示
@@ -56,62 +58,37 @@ function getUsernameFromPath() {
 }
 
 // 更新奖励历史
-function updateRewardsHistory(rewards) {
-    const rewardsList = document.getElementById('rewards-list');
-    rewardsList.innerHTML = '';
+function updateRewardsList(rewards) {
+    const tbody = document.getElementById('rewards-list');
+    tbody.innerHTML = '';
     
     rewards.forEach(reward => {
         const row = document.createElement('tr');
-        // 根据类型格式化金额
-        const formattedAmount = reward.type === 'xmr' 
-            ? formatXMR(reward.amount)
-            : formatTARI(reward.amount);
-            
-        // 根据类型格式化份额
-        const formattedShares = formatNumber(reward.shares);
-        
         row.innerHTML = `
-            <td>${formatTime(reward.timestamp)}</td>
-            <td>${reward.height}</td>
-            <td>
-                <span class="block-type block-type-${reward.type.toLowerCase()}">
-                    ${reward.type === 'tari' ? 'XTM' : reward.type.toUpperCase()}
-                </span>
-            </td>
-            <td>${formattedAmount}</td>
-            <td>${formattedShares}</td>
+            <td>${formatTime(reward.time)}</td>
+            <td>${reward.block_height}</td>
+            <td>${reward.type.toUpperCase()}</td>
+            <td>${reward.type === 'xmr' ? formatXMR(reward.reward) : formatTARI(reward.reward)}</td>
+            <td>${reward.shares}</td>
         `;
-        rewardsList.appendChild(row);
+        tbody.appendChild(row);
     });
 }
 
 // 更新支付历史
-function updatePaymentsHistory(payments) {
-    const paymentsList = document.getElementById('payments-list');
-    paymentsList.innerHTML = '';
+function updatePaymentsList(payments) {
+    const tbody = document.getElementById('payments-list');
+    tbody.innerHTML = '';
     
     payments.forEach(payment => {
         const row = document.createElement('tr');
-        // 根据类型格式化金额
-        const formattedAmount = payment.type === 'xmr' 
-            ? formatXMR(payment.amount)
-            : formatTARI(payment.amount);
-            
         row.innerHTML = `
-            <td>${formatTime(payment.timestamp)}</td>
-            <td>
-                <a href="https://explorer.tari.com/transaction/${payment.txid}" target="_blank" class="txid-link">
-                    ${payment.txid}
-                </a>
-            </td>
-            <td>
-                <span class="block-type block-type-${payment.type.toLowerCase()}">
-                    ${payment.type === 'tari' ? 'XTM' : payment.type.toUpperCase()}
-                </span>
-            </td>
-            <td>${formattedAmount}</td>
+            <td>${formatTime(payment.time)}</td>
+            <td>${payment.tx_id || '-'}</td>
+            <td>${payment.type.toUpperCase()}</td>
+            <td>${payment.type === 'xmr' ? formatXMR(payment.amount) : formatTARI(payment.amount)}</td>
         `;
-        paymentsList.appendChild(row);
+        tbody.appendChild(row);
     });
 }
 
@@ -130,21 +107,21 @@ function updateUserInfo() {
             document.getElementById('username').textContent = data.username;
             document.getElementById('created-at').textContent = formatTime(data.created_at);
             document.getElementById('current-hashrate').textContent = formatHashrate(data.current_hashrate);
-            document.getElementById('user-fee').textContent = formatFee(data.fee);
+            document.getElementById('user-fee').textContent = (data.fee * 100).toFixed(2) + '%';
             
             // 更新钱包地址
-            document.getElementById('xmr-wallet').textContent = data.xmr_wallet || '未设置';
-            document.getElementById('tari-wallet').textContent = data.tari_wallet || '未设置';
+            document.getElementById('xmr-wallet').textContent = data.xmr_wallet || '-';
+            document.getElementById('tari-wallet').textContent = data.tari_wallet || '-';
             
             // 更新余额
             document.getElementById('xmr-balance').textContent = formatXMR(data.xmr_balance);
             document.getElementById('tari-balance').textContent = formatTARI(data.tari_balance);
             
             // 更新奖励历史
-            updateRewardsHistory(data.rewards);
+            updateRewardsList(data.rewards);
             
             // 更新支付历史
-            updatePaymentsHistory(data.payments);
+            updatePaymentsList(data.payments);
         })
         .catch(error => console.error('获取用户信息失败:', error));
 }
