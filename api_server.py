@@ -69,18 +69,15 @@ REDIS_PORT = 6379
 REDIS_DB = 0
 
 # 初始化Redis连接
-try:
-    redis_client = redis.Redis(
-        host=REDIS_HOST,
-        port=REDIS_PORT,
-        db=REDIS_DB,
-        decode_responses=True  # 自动将响应解码为字符串
+async def init_redis():
+    global redis_client
+    redis_client = await aioredis.create_redis_pool(
+        'redis://localhost',
+        encoding='utf-8',
+        maxsize=10
     )
-    redis_client.ping()  # 测试连接
+    await FastAPILimiter.init(redis_client)
     logger.info("Successfully connected to Redis")
-except redis.ConnectionError as e:
-    logger.error(f"Failed to connect to Redis: {str(e)}")
-    raise
 
 # Redis键前缀
 XMR_PREFIX = "xmr:submit:"
@@ -90,14 +87,18 @@ TARI_PREFIX = "tari:submit:"
 xmr_blocks = []
 
 # PostgreSQL数据库连接
-def get_db_connection():
-    return psycopg2.connect(
+async def init_db():
+    global db_pool
+    db_pool = await asyncpg.create_pool(
         host=config['database']['host'],
         port=config['database']['port'],
-        database=config['database']['database'],
         user=config['database']['user'],
-        password=config['database']['password']
+        password=config['database']['password'],
+        database=config['database']['database'],
+        min_size=5,
+        max_size=20
     )
+    logger.info("Successfully connected to PostgreSQL")
 
 def get_chain_key(username: str, chain: str) -> str:
     """获取Redis键名"""
@@ -143,46 +144,35 @@ def get_submit_counts(username: str) -> Dict[str, int]:
         logger.error(f"Redis error while getting submit counts: {str(e)}")
         raise
 
-def handle_submit(params: Dict[str, Any]) -> Dict[str, Any]:
-    """处理submit方法的请求"""
+async def handle_submit(params: Dict[str, Any]):
     try:
         username = params.get('username')
         if not username:
-            logger.warning(f"Invalid submission: missing username")
-            return {
-                'error': {
-                    'code': -32602,
-                    'message': 'Invalid params: username is required'
-                }
-            }
+            raise HTTPException(status_code=400, detail="Username is required")
+
+        # 使用异步Redis操作
+        xmr_key = get_chain_key(username, 'xmr')
+        tari_key = get_chain_key(username, 'tari')
         
-        # 同时增加两条链的提交计数
-        submit_counts = increment_submit_count(username)
-        
-        # 记录提交
-        submission = {
-            'username': username,
-            'timestamp': datetime.now().isoformat(),
-            'submit_counts': submit_counts
-        }
-        
-        #logger.info(f"Share submitted - User: {username}, XMR submits: {submit_counts['xmr']}, TARI submits: {submit_counts['tari']}")
-        
+        # 使用事务处理提交
+        tr = redis_client.multi_exec()
+        tr.incr(xmr_key)
+        tr.incr(tari_key)
+        tr.expire(xmr_key, 30 * 24 * 60 * 60)
+        tr.expire(tari_key, 30 * 24 * 60 * 60)
+        xmr_count, tari_count, _, _ = await tr.execute()
+
         return {
-            'result': {
-                'status': 'OK',
-                'message': 'Submission recorded successfully',
-                'submit_counts': submit_counts
+            'status': 'OK',
+            'message': 'Submission recorded successfully',
+            'submit_counts': {
+                'xmr': xmr_count,
+                'tari': tari_count
             }
         }
     except Exception as e:
-        logger.error(f"Error processing submission: {str(e)}")
-        return {
-            'error': {
-                'code': -32000,
-                'message': f'Internal error: {str(e)}'
-            }
-        }
+        logger.error(f"Error in handle_submit: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 def handle_xmr_block(params):
     """处理XMR爆块信息"""
@@ -491,50 +481,8 @@ def handle_tari_block(params):
         logging.error(f"处理TARI区块信息失败: {str(e)}")
         return {'error': f'处理失败: {str(e)}'}
 
-def handle_json_rpc(data):
-    """处理JSON-RPC请求"""
-    try:
-        if not isinstance(data, dict):
-            raise ValueError("Invalid request format")
-        
-        if data.get('jsonrpc') != '2.0':
-            raise ValueError("Invalid JSON-RPC version")
-        
-        method = data.get('method')
-        params = data.get('params', {})
-        request_id = data.get('id')
-        
-        if not method:
-            raise ValueError("Method is required")
-        
-        result = None
-        if method == 'submit':
-            result = handle_submit(params)
-        elif method == 'xmr_block':
-            result = handle_xmr_block(params)
-        elif method == 'tari_block':
-            result = handle_tari_block(params)
-        else:
-            raise ValueError(f"Method {method} not found")
-        
-        return {
-            'jsonrpc': '2.0',
-            'id': request_id,
-            'result': result
-        }
-    except Exception as e:
-        logger.error(f"Error handling JSON-RPC request: {str(e)}")
-        return {
-            'jsonrpc': '2.0',
-            'id': data.get('id'),
-            'error': {
-                'code': -32000,
-                'message': str(e)
-            }
-        }
-
 @app.post("/json_rpc")
-@rate_limit(limit=1000, period=60)  # 每分钟1000次请求
+@rate_limit(limit=1000, period=60)
 async def handle_json_rpc(request: Dict[str, Any]):
     try:
         method = request.get('method')
@@ -547,6 +495,7 @@ async def handle_json_rpc(request: Dict[str, Any]):
         result = None
         if method == 'submit':
             result = await handle_submit(params)
+
         else:
             raise HTTPException(status_code=404, detail=f"Method {method} not found")
 
@@ -756,8 +705,7 @@ def init_base_data():
             cur.execute("""
                 INSERT INTO account (username, xmr_wallet, tari_wallet)
                 VALUES 
-                ('miner1', 'XMR_WALLET_ADDRESS_1', 'TARI_WALLET_ADDRESS_1'),
-                ('miner2', 'XMR_WALLET_ADDRESS_2', 'TARI_WALLET_ADDRESS_2')
+                ('miner1', 'XMR_WALLET_ADDRESS_1', 'TARI_WALLET_ADDRESS_1')
             """)
             
             conn.commit()
@@ -1185,6 +1133,19 @@ def get_user_payments(username):
         cur.close()
         conn.close()
 
+@app.on_event("startup")
+async def startup():
+    await init_redis()
+    await init_db()
+
+@app.on_event("shutdown")
+async def shutdown():
+    if redis_client:
+        redis_client.close()
+        await redis_client.wait_closed()
+    if db_pool:
+        await db_pool.close()
+
 # 在 main 函数中添加检查器的启动代码
 if __name__ == '__main__':
     logger.info("Starting API server...")
@@ -1198,10 +1159,11 @@ if __name__ == '__main__':
             "api_server:app",
             host="0.0.0.0",
             port=5000,
-            workers=4,  # 使用4个工作进程
-            loop="uvloop",  # 使用uvloop提高性能
-            limit_concurrency=1000,  # 限制并发连接数
-            backlog=2048  # 连接队列大小
+            workers=4,
+            loop="uvloop",
+            limit_concurrency=1000,
+            backlog=2048,
+            reload=True  # 开发模式下启用热重载
         )
     finally:
         # 确保在服务器关闭时停止所有线程
