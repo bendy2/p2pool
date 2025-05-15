@@ -1009,6 +1009,7 @@ class TariBlockChecker(threading.Thread):
             
             if not remote_hash or remote_hash != block_hash:
                 logger.warning(f"区块 {block[1]} 远程哈希无效")
+                self.handle_invalid_block(block[0], block[1])
                 return
 
             # 更新区块状态
