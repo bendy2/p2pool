@@ -193,7 +193,7 @@ async def handle_submit(params: Dict[str, Any]):
         logger.error(f"Error in handle_submit: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-def handle_xmr_block(params):
+async def handle_xmr_block(params):
     """处理XMR爆块信息"""
     logger.info(f"处理 XMR 区块 {params.get('height')} : {params.get('reward')} 信息")
     try:
@@ -203,15 +203,15 @@ def handle_xmr_block(params):
         if not block_height or not reward:
             return {'error': '缺少必要参数'}
             
-        # 首先检查数据库中是否已存在该区块
-        conn = get_db_connection()
-        cur = conn.cursor()
-        
-        try:
-            cur.execute("SELECT COUNT(*) FROM blocks WHERE block_height = %s AND type = 'xmr'", (block_height,))
-            exists = cur.fetchone()[0] > 0
+        # 使用异步数据库连接
+        async with db_pool.acquire() as conn:
+            # 首先检查数据库中是否已存在该区块
+            exists = await conn.fetchval(
+                "SELECT COUNT(*) FROM blocks WHERE block_height = $1 AND type = 'xmr'",
+                block_height
+            )
             
-            if exists:
+            if exists > 0:
                 logger.info(f"XMR 区块 {block_height} 已存在于数据库中，跳过处理")
                 return {
                     'success': True,
@@ -222,46 +222,47 @@ def handle_xmr_block(params):
             # 1. 统计XMR链的submit总数
             total_shares = 0
             user_shares = {}
-            xmr_wallet={}
-            tari_wallet={}
-            for key in redis_client.keys('xmr:submit:*'):
+            xmr_wallet = {}
+            tari_wallet = {}
+            
+            # 获取所有XMR提交记录
+            xmr_keys = await redis_client.keys('xmr:submit:*')
+            for key in xmr_keys:
                 # 只删除前缀，保留完整的用户名
                 data = key.replace(XMR_PREFIX, '')
                 
                 # 判断用户名长度
                 if len(data) > 50:
-                    # 如果长度超过50，使用原来的分割逻辑
                     username = data.split(':')[1]
                     xmr_wallet[username] = data.split(':')[0]
                     tari_wallet[username] = data.split(':')[1]
                 else:
-                    # 如果长度不超过50，直接使用整个字符串作为用户名
                     username = data
                     xmr_wallet[username] = ""
                     tari_wallet[username] = ""
 
                 # 从数据库获取用户的钱包地址
-                cur.execute("""
+                wallet_info = await conn.fetchrow("""
                     SELECT xmr_wallet, tari_wallet 
                     FROM account 
-                    WHERE username = %s and xmr_wallet != ''
-                """, (username,))
-                result = cur.fetchone()
-                if result:
-                    xmr_wallet[username], tari_wallet[username] = result
+                    WHERE username = $1 and xmr_wallet != ''
+                """, username)
+                
+                if wallet_info:
+                    xmr_wallet[username], tari_wallet[username] = wallet_info
                 else:
-                    if xmr_wallet[username] != "":
-                        cur.execute("""
+                    if xmr_wallet[username]:
+                        await conn.execute("""
                             UPDATE account 
-                            SET xmr_wallet = %s,
-                                tari_wallet = %s
-                            WHERE username = %s
-                        """, (xmr_wallet[username], tari_wallet[username], username))
+                            SET xmr_wallet = $1,
+                                tari_wallet = $2
+                            WHERE username = $3
+                        """, xmr_wallet[username], tari_wallet[username], username)
                     else:
                         xmr_wallet[username] = ""
-                        tari_wallet[username] = "" 
+                        tari_wallet[username] = ""
                         
-                shares = int(redis_client.get(key) or 0)
+                shares = int(await redis_client.get(key) or 0)
                 total_shares += shares
                 user_shares[username] = shares
                 
@@ -271,12 +272,13 @@ def handle_xmr_block(params):
             # 2. 将区块信息写入数据库
             current_time = datetime.now()
             value = reward / total_shares
+            
             # 插入区块记录
-            cur.execute("""
+            await conn.execute("""
                 INSERT INTO blocks (block_height, rewards, type, total_shares, time, value, is_valid, check_status)
-                VALUES (%s, %s, 'xmr', %s, %s, %s, %s, True)
+                VALUES ($1, $2, 'xmr', $3, $4, $5, $6, True)
                 ON CONFLICT (block_height) DO NOTHING
-            """, (block_height, reward, total_shares, current_time, value, True))
+            """, block_height, reward, total_shares, current_time, value, True)
             
             # 3. 计算用户奖励
             fee = config['pool_fees']
@@ -288,42 +290,40 @@ def handle_xmr_block(params):
                     user_reward = value * shares * (1 - fee)
                     
                     # 检查用户是否存在，不存在则创建
-                    cur.execute("""
+                    await conn.execute("""
                         INSERT INTO account (username, xmr_wallet, tari_wallet, xmr_balance, tari_balance, fee)
-                        VALUES (%s, %s, %s, 0, 0, %s)
+                        VALUES ($1, $2, $3, 0, 0, $4)
                         ON CONFLICT (username) DO NOTHING
-                    """, (username, xmr_wallet[username], tari_wallet[username], fee))
+                    """, username, xmr_wallet[username], tari_wallet[username], fee)
                     
                     # 检查是否已存在该用户的奖励记录
-                    cur.execute("""
+                    exists = await conn.fetchval("""
                         SELECT COUNT(*) 
                         FROM rewards 
-                        WHERE block_height = %s 
+                        WHERE block_height = $1 
                         AND type = 'xmr' 
-                        AND username = %s
-                    """, (block_height, username))
+                        AND username = $2
+                    """, block_height, username)
                     
-                    if cur.fetchone()[0] == 0:
+                    if not exists:
                         # 插入奖励记录
-                        cur.execute("""
+                        await conn.execute("""
                             INSERT INTO rewards (block_height, type, username, reward, shares)
-                            VALUES (%s, 'xmr', %s, %s, %s)
-                        """, (block_height, username, user_reward, shares))
+                            VALUES ($1, 'xmr', $2, $3, $4)
+                        """, block_height, username, user_reward, shares)
                         
                         # 更新用户余额
-                        cur.execute("""
+                        await conn.execute("""
                             UPDATE account 
-                            SET xmr_balance = xmr_balance + %s
-                            WHERE username = %s
-                        """, (user_reward, username))
+                            SET xmr_balance = xmr_balance + $1
+                            WHERE username = $2
+                        """, user_reward, username)
                     else:
                         logger.info(f"用户 {username} 的 XMR 区块 {block_height} 奖励记录已存在，跳过")
             
-            conn.commit()
-            
             # 5. 清空Redis中的XMR提交记录
-            for key in redis_client.keys('xmr:submit:*'):
-                redis_client.delete(key)
+            for key in xmr_keys:
+                await redis_client.delete(key)
                 
             return {
                 'success': True,
@@ -332,20 +332,11 @@ def handle_xmr_block(params):
                 'time': current_time.isoformat()
             }
             
-        except Exception as e:
-            conn.rollback()
-            logging.error(f"数据库操作失败: {str(e)}")
-            return {'error': f'数据库操作失败: {str(e)}'}
-            
-        finally:
-            cur.close()
-            conn.close()
-            
     except Exception as e:
-        logging.error(f"处理XMR区块信息失败: {str(e)}")
+        logger.error(f"处理XMR区块信息失败: {str(e)}")
         return {'error': f'处理失败: {str(e)}'}
 
-def handle_tari_block(params):
+async def handle_tari_block(params):
     """处理TARI爆块信息"""
     logger.info(f"处理 TARI 区块 {params.get('height')} 信息")
     try:
@@ -354,15 +345,15 @@ def handle_tari_block(params):
         if not block_height:
             return {'error': '缺少必要参数'}
             
-        # 首先检查数据库中是否已存在该区块
-        conn = get_db_connection()
-        cur = conn.cursor()
-        
-        try:
-            cur.execute("SELECT COUNT(*) FROM blocks WHERE block_height = %s AND type = 'tari'", (block_height,))
-            exists = cur.fetchone()[0] > 0
+        # 使用异步数据库连接
+        async with db_pool.acquire() as conn:
+            # 首先检查数据库中是否已存在该区块
+            exists = await conn.fetchval(
+                "SELECT COUNT(*) FROM blocks WHERE block_height = $1 AND type = 'tari'",
+                block_height
+            )
             
-            if exists:
+            if exists > 0:
                 logger.info(f"TARI 区块 {block_height} 已存在于数据库中，跳过处理")
                 return {
                     'success': True,
@@ -374,45 +365,47 @@ def handle_tari_block(params):
             # 1. 统计TARI链的submit总数
             total_shares = 0
             user_shares = {}
-            xmr_wallet={}
-            tari_wallet={}
-            for key in redis_client.keys('tari:submit:*'):
+            xmr_wallet = {}
+            tari_wallet = {}
+            
+            # 获取所有TARI提交记录
+            tari_keys = await redis_client.keys('tari:submit:*')
+            for key in tari_keys:
                 # 只删除前缀，保留完整的用户名
-                data    = key.replace(TARI_PREFIX, '')
-                                # 判断用户名长度
+                data = key.replace(TARI_PREFIX, '')
+                
+                # 判断用户名长度
                 if len(data) > 50:
-                    # 如果长度超过50，使用原来的分割逻辑
                     username = data.split(':')[1]
                     xmr_wallet[username] = data.split(':')[0]
                     tari_wallet[username] = data.split(':')[1]
                 else:
-                    # 如果长度不超过50，直接使用整个字符串作为用户名
                     username = data
                     xmr_wallet[username] = ""
                     tari_wallet[username] = ""
 
-
-                cur.execute("""
+                # 从数据库获取用户的钱包地址
+                wallet_info = await conn.fetchrow("""
                     SELECT xmr_wallet, tari_wallet 
                     FROM account 
-                    WHERE username = %s and xmr_wallet != ''
-                """, (username,))
-                result = cur.fetchone()
-                if result:
-                    xmr_wallet[username], tari_wallet[username] = result
+                    WHERE username = $1 and xmr_wallet != ''
+                """, username)
+                
+                if wallet_info:
+                    xmr_wallet[username], tari_wallet[username] = wallet_info
                 else:
-                    if xmr_wallet[username] != "":
-                        cur.execute("""
+                    if xmr_wallet[username]:
+                        await conn.execute("""
                             UPDATE account 
-                            SET xmr_wallet = %s,
-                                tari_wallet = %s
-                            WHERE username = %s
-                        """, (xmr_wallet[username], tari_wallet[username], username))
+                            SET xmr_wallet = $1,
+                                tari_wallet = $2
+                            WHERE username = $3
+                        """, xmr_wallet[username], tari_wallet[username], username)
                     else:
                         xmr_wallet[username] = ""
-                        tari_wallet[username] = "" 
+                        tari_wallet[username] = ""
                         
-                shares = int(redis_client.get(key) or 0)
+                shares = int(await redis_client.get(key) or 0)
                 total_shares += shares
                 user_shares[username] = shares
                 
@@ -420,17 +413,16 @@ def handle_tari_block(params):
                 return {'error': '没有找到提交记录'}
                 
             # 2. 将区块信息写入数据库
-            # 从配置文件获取TARI区块奖励
             reward = config['rewards']['tari_block_reward']
             value = reward / total_shares
             current_time = datetime.now()
             
             # 插入区块记录
-            cur.execute("""
+            await conn.execute("""
                 INSERT INTO blocks (block_height, rewards, type, total_shares, time, value, is_valid, check_status, block_id)
-                VALUES (%s, %s, 'tari', %s, %s, %s, %s, False, %s)
+                VALUES ($1, $2, 'tari', $3, $4, $5, $6, False, $7)
                 ON CONFLICT (block_height) DO NOTHING
-            """, (block_height, reward, total_shares, current_time, value, False, block_id))
+            """, block_height, reward, total_shares, current_time, value, False, block_id)
             
             # 3. 计算用户奖励
             fee = config['pool_fees']
@@ -442,42 +434,40 @@ def handle_tari_block(params):
                     user_reward = value * shares * (1 - fee)
                     
                     # 检查用户是否存在，不存在则创建
-                    cur.execute("""
+                    await conn.execute("""
                         INSERT INTO account (username, xmr_wallet, tari_wallet, tari_balance, xmr_balance, fee)
-                        VALUES (%s, %s, %s, 0, 0, %s)
+                        VALUES ($1, $2, $3, 0, 0, $4)
                         ON CONFLICT (username) DO NOTHING
-                    """, (username, xmr_wallet[username], tari_wallet[username], fee))
+                    """, username, xmr_wallet[username], tari_wallet[username], fee)
                     
                     # 检查是否已存在该用户的奖励记录
-                    cur.execute("""
+                    exists = await conn.fetchval("""
                         SELECT COUNT(*) 
                         FROM rewards 
-                        WHERE block_height = %s 
+                        WHERE block_height = $1 
                         AND type = 'tari' 
-                        AND username = %s
-                    """, (block_height, username))
+                        AND username = $2
+                    """, block_height, username)
                     
-                    if cur.fetchone()[0] == 0:
+                    if not exists:
                         # 插入奖励记录
-                        cur.execute("""
+                        await conn.execute("""
                             INSERT INTO rewards (block_height, type, username, reward, shares)
-                            VALUES (%s, 'tari', %s, %s, %s)
-                        """, (block_height, username, user_reward, shares))
+                            VALUES ($1, 'tari', $2, $3, $4)
+                        """, block_height, username, user_reward, shares)
                         
                         # 更新用户余额
-                        cur.execute("""
+                        await conn.execute("""
                             UPDATE account 
-                            SET tari_balance = tari_balance + %s
-                            WHERE username = %s
-                        """, (user_reward, username))
+                            SET tari_balance = tari_balance + $1
+                            WHERE username = $2
+                        """, user_reward, username)
                     else:
                         logger.info(f"用户 {username} 的 TARI 区块 {block_height} 奖励记录已存在，跳过")
             
-            conn.commit()
-            
             # 5. 清空Redis中的TARI提交记录
-            for key in redis_client.keys('tari:submit:*'):
-                redis_client.delete(key)
+            for key in tari_keys:
+                await redis_client.delete(key)
                 
             return {
                 'success': True,
@@ -487,17 +477,8 @@ def handle_tari_block(params):
                 'time': current_time.isoformat()
             }
             
-        except Exception as e:
-            conn.rollback()
-            logging.error(f"数据库操作失败: {str(e)}")
-            return {'error': f'数据库操作失败: {str(e)}'}
-            
-        finally:
-            cur.close()
-            conn.close()
-            
     except Exception as e:
-        logging.error(f"处理TARI区块信息失败: {str(e)}")
+        logger.error(f"处理TARI区块信息失败: {str(e)}")
         return {'error': f'处理失败: {str(e)}'}
 
 @app.post("/json_rpc")
@@ -819,8 +800,12 @@ class LogMonitorThread(threading.Thread):
                 reward = float(xmr_match.group(1))
                 height = int(xmr_match.group(2))
                 logger.info(f"检测到 XMR 爆块 - 高度: {height}, 奖励: {reward}")
-                # 直接调用处理函数，让处理函数进行数据库检查
-                asyncio.create_task(handle_xmr_block({'height': height, 'reward': reward}))
+                # 创建新的事件循环
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                # 运行异步处理函数
+                loop.run_until_complete(handle_xmr_block({'height': height, 'reward': reward}))
+                loop.close()
                 return
                 
             # 检查 TARI 爆块信息
@@ -829,8 +814,12 @@ class LogMonitorThread(threading.Thread):
                 height = int(tari_match.group(2))
                 block_id = tari_match.group(1)
                 logger.info(f"检测到 TARI 爆块 - 高度: {height}, 区块ID: {block_id}")
-                # 直接调用处理函数，让处理函数进行数据库检查
-                asyncio.create_task(handle_tari_block({'height': height, 'block_id': block_id}))
+                # 创建新的事件循环
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                # 运行异步处理函数
+                loop.run_until_complete(handle_tari_block({'height': height, 'block_id': block_id}))
+                loop.close()
                 
         except Exception as e:
             logger.error(f"处理日志行时出错: {str(e)}")
