@@ -1107,4 +1107,115 @@ if __name__ == '__main__':
         # 确保在服务器关闭时停止所有线程
         log_monitor.stop()
         if 'tari_checker' in locals():
-            tari_checker.stop() 
+            tari_checker.stop()
+
+@app.route('/api/user/<username>')
+def get_user_info(username):
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor(cursor_factory=DictCursor)
+        
+        # 获取用户信息
+        cur.execute("""
+            SELECT username, xmr_balance, tari_balance, xmr_wallet, tari_wallet, fee, created_at
+            FROM account 
+            WHERE username = %s
+        """, (username,))
+        
+        user = cur.fetchone()
+        if not user:
+            return jsonify({'error': '用户不存在'}), 404
+            
+        # 获取用户当前算力
+        xmr_shares = int(redis_client.get(f"{XMR_PREFIX}{username}") or 0)
+        tari_shares = int(redis_client.get(f"{TARI_PREFIX}{username}") or 0)
+        
+        # 计算当前算力（假设每个share代表1H/s）
+        current_hashrate = xmr_shares + tari_shares
+        
+        return jsonify({
+            'username': user['username'],
+            'xmr_balance': float(user['xmr_balance']),
+            'tari_balance': float(user['tari_balance']),
+            'xmr_wallet': user['xmr_wallet'],
+            'tari_wallet': user['tari_wallet'],
+            'fee': float(user['fee']),
+            'created_at': user['created_at'].isoformat() if user['created_at'] else None,
+            'current_hashrate': current_hashrate
+        })
+        
+    except Exception as e:
+        logger.error(f"获取用户信息失败: {str(e)}")
+        return jsonify({'error': '获取用户信息失败'}), 500
+    finally:
+        cur.close()
+        conn.close()
+
+@app.route('/api/rewards/<username>')
+def get_user_rewards(username):
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor(cursor_factory=DictCursor)
+        
+        # 获取用户奖励历史
+        cur.execute("""
+            SELECT r.block_height, r.type, r.reward, r.shares, r.time, b.rewards as block_reward
+            FROM rewards r
+            JOIN blocks b ON r.block_height = b.block_height AND r.type = b.type
+            WHERE r.username = %s
+            ORDER BY r.time DESC
+            LIMIT 100
+        """, (username,))
+        
+        rewards = cur.fetchall()
+        
+        return jsonify({
+            'rewards': [{
+                'block_height': reward['block_height'],
+                'type': reward['type'],
+                'reward': float(reward['reward']),
+                'shares': reward['shares'],
+                'time': reward['time'].isoformat() if reward['time'] else None,
+                'block_reward': float(reward['block_reward'])
+            } for reward in rewards]
+        })
+        
+    except Exception as e:
+        logger.error(f"获取用户奖励历史失败: {str(e)}")
+        return jsonify({'error': '获取用户奖励历史失败'}), 500
+    finally:
+        cur.close()
+        conn.close()
+
+@app.route('/api/payments/<username>')
+def get_user_payments(username):
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor(cursor_factory=DictCursor)
+        
+        # 获取用户支付历史
+        cur.execute("""
+            SELECT tx_id, type, amount, time
+            FROM payments
+            WHERE username = %s
+            ORDER BY time DESC
+            LIMIT 100
+        """, (username,))
+        
+        payments = cur.fetchall()
+        
+        return jsonify({
+            'payments': [{
+                'tx_id': payment['tx_id'],
+                'type': payment['type'],
+                'amount': float(payment['amount']),
+                'time': payment['time'].isoformat() if payment['time'] else None
+            } for payment in payments]
+        })
+        
+    except Exception as e:
+        logger.error(f"获取用户支付历史失败: {str(e)}")
+        return jsonify({'error': '获取用户支付历史失败'}), 500
+    finally:
+        cur.close()
+        conn.close() 

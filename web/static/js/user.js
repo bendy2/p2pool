@@ -3,34 +3,21 @@ function formatNumber(num) {
     return new Intl.NumberFormat('zh-CN').format(num);
 }
 
-// 格式化时间（北京时间）
-function formatTime(timestamp) {
-    if (!timestamp) return '未知时间';
-    
-    try {
-        // 直接解析GMT时间字符串
-        const date = new Date(timestamp);
-        
-        // 检查日期是否有效
-        if (isNaN(date.getTime())) return '无效时间';
-        
-        // 转换为北京时间（UTC+8）
-        const beijingTime = new Date(date.getTime() + 8 * 60 * 60 * 1000);
-        
-        return beijingTime.toLocaleString('zh-CN', {
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-            hour12: false,
-            timeZone: 'Asia/Shanghai'
-        });
-    } catch (error) {
-        console.error('时间格式化错误:', error);
-        return '时间错误';
-    }
+// 格式化时间为北京时间
+function formatTime(utcTime) {
+    if (!utcTime) return '-';
+    const date = new Date(utcTime);
+    // 转换为北京时间 (UTC+8)
+    const beijingTime = new Date(date.getTime() + 8 * 60 * 60 * 1000);
+    return beijingTime.toLocaleString('zh-CN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+    });
 }
 
 // 格式化XMR金额（6位小数）
@@ -141,7 +128,7 @@ function updateUserInfo() {
         .then(data => {
             // 更新基本信息
             document.getElementById('username').textContent = data.username;
-            document.getElementById('created-at').textContent = new Date(data.created_at).toLocaleString('zh-CN');
+            document.getElementById('created-at').textContent = formatTime(data.created_at);
             document.getElementById('current-hashrate').textContent = formatHashrate(data.current_hashrate);
             document.getElementById('user-fee').textContent = formatFee(data.fee);
             
