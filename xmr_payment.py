@@ -277,9 +277,9 @@ class XMRPayment:
                 logger.info(f"正在处理用户 {username} 的支付，金额: {payment_info['payment_amount']:.3f} XMR")
                 
                 # 检查钱包地址格式
-                if not wallet_address.startswith('4'):
-                    logger.warning(f"用户 {username} 的钱包地址 {wallet_address} 格式无效，跳过支付")
-                    continue
+                #if not wallet_address.startswith('4'):
+                #    logger.warning(f"用户 {username} 的钱包地址 {wallet_address} 格式无效，跳过支付")
+                #    continue
                 
                 # 处理支付
                 success = self.process_payment(payment_info)
