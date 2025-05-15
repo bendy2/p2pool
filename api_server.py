@@ -980,7 +980,7 @@ class TariBlockChecker(threading.Thread):
                 """, (block_id,))
             
             conn.commit()
-            logger.info(f"区块 {block_id} 状态已更新: is_valid={is_valid}")
+            logger.info(f"区块 {block_id} 状态已更新: is_valid={is_valid} remote_hash={remote_hash}")
             
         except Exception as e:
             conn.rollback()
