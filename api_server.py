@@ -1102,21 +1102,7 @@ class TariBlockChecker(threading.Thread):
         """停止检查器"""
         self.running = False
 
-# 在 main 函数中添加检查器的启动代码
-if __name__ == '__main__':
-    logger.info("Starting API server...")
-    try:
-        # 启动 Tari 区块检查器
-        tari_checker = TariBlockChecker(config['database'])
-        tari_checker.start()
-        
-        # 启动 API 服务器
-        app.run(host='0.0.0.0', port=5000)
-    finally:
-        # 确保在服务器关闭时停止所有线程
-        log_monitor.stop()
-        if 'tari_checker' in locals():
-            tari_checker.stop()
+
 
 @app.route('/api/user/<username>')
 def get_user_info(username):
@@ -1277,7 +1263,20 @@ class HashrateRecorder(threading.Thread):
             
     def stop(self):
         self.running = False
-
-# 在应用启动时启动算力记录器
-hashrate_recorder = HashrateRecorder()
-hashrate_recorder.start() 
+# 在 main 函数中添加检查器的启动代码
+if __name__ == '__main__':
+    logger.info("Starting API server...")
+    try:
+        # 启动 Tari 区块检查器
+        tari_checker = TariBlockChecker(config['database'])
+        tari_checker.start()
+        hashrate_recorder = HashrateRecorder()
+        hashrate_recorder.start() 
+        
+        # 启动 API 服务器
+        app.run(host='0.0.0.0', port=5000)
+    finally:
+        # 确保在服务器关闭时停止所有线程
+        log_monitor.stop()
+        if 'tari_checker' in locals():
+            tari_checker.stop()
