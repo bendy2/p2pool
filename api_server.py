@@ -846,6 +846,24 @@ class TariBlockChecker(threading.Thread):
         self.db_config = db_config
         self.api_url = "https://explore.tari.com/blocks/{height}?json"
         self.check_interval = 60  # 检查间隔（秒）
+        self.db_pool = None  # 添加数据库连接池属性
+
+    async def init_db_pool(self):
+        """初始化数据库连接池"""
+        try:
+            self.db_pool = await asyncpg.create_pool(
+                host=self.db_config['host'],
+                port=self.db_config['port'],
+                user=self.db_config['user'],
+                password=self.db_config['password'],
+                database=self.db_config['database'],
+                min_size=5,
+                max_size=20
+            )
+            logger.info("TariBlockChecker: 数据库连接池初始化成功")
+        except Exception as e:
+            logger.error(f"TariBlockChecker: 数据库连接池初始化失败: {str(e)}")
+            raise
 
     def buffer_to_hex(self, buffer_data):
         """将 Buffer 数据转换为十六进制字符串"""
@@ -894,33 +912,12 @@ class TariBlockChecker(threading.Thread):
             logger.error(f"处理 API 响应时发生未知错误: {e}")
             return None
 
-    async def update_block_status(self, block_id, is_valid, remote_hash=None):
-        """更新区块状态"""
-        try:
-            async with db_pool.acquire() as conn:
-                if is_valid:
-                    await conn.execute("""
-                        UPDATE blocks 
-                        SET check_status = true, 
-                            is_valid = true
-                        WHERE id = $1
-                    """, block_id)
-                else:
-                    await conn.execute("""
-                        UPDATE blocks 
-                        SET check_status = true, 
-                            is_valid = false
-                        WHERE id = $1
-                    """, block_id)
-                
-                logger.info(f"区块 {block_id} 状态已更新: is_valid={is_valid} remote_hash={remote_hash}")
-                
-        except Exception as e:
-            logger.error(f"更新区块状态失败: {e}")
-
     async def check_block(self):
         """检查一个区块"""
-        async with db_pool.acquire() as conn:
+        if not self.db_pool:
+            await self.init_db_pool()
+
+        async with self.db_pool.acquire() as conn:
             block = await conn.fetchrow("""
                 SELECT id, block_height, block_id 
                 FROM blocks 
@@ -961,10 +958,40 @@ class TariBlockChecker(threading.Thread):
                 # 如果发生错误，将区块标记为无效
                 await self.handle_invalid_block(block['id'], block['block_height'])
 
+    async def update_block_status(self, block_id, is_valid, remote_hash=None):
+        """更新区块状态"""
+        if not self.db_pool:
+            await self.init_db_pool()
+
+        try:
+            async with self.db_pool.acquire() as conn:
+                if is_valid:
+                    await conn.execute("""
+                        UPDATE blocks 
+                        SET check_status = true, 
+                            is_valid = true
+                        WHERE id = $1
+                    """, block_id)
+                else:
+                    await conn.execute("""
+                        UPDATE blocks 
+                        SET check_status = true, 
+                            is_valid = false
+                        WHERE id = $1
+                    """, block_id)
+                
+                logger.info(f"区块 {block_id} 状态已更新: is_valid={is_valid} remote_hash={remote_hash}")
+                
+        except Exception as e:
+            logger.error(f"更新区块状态失败: {e}")
+
     async def handle_invalid_block(self, block_id, block_height):
         """处理无效区块"""
+        if not self.db_pool:
+            await self.init_db_pool()
+
         try:
-            async with db_pool.acquire() as conn:
+            async with self.db_pool.acquire() as conn:
                 async with conn.transaction():
                     # 1. 更新区块状态为无效
                     await conn.execute("""
@@ -1012,7 +1039,12 @@ class TariBlockChecker(threading.Thread):
         """运行检查器"""
         while self.running:
             try:
-                asyncio.run(self.check_block())
+                # 创建新的事件循环
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                # 运行检查
+                loop.run_until_complete(self.check_block())
+                loop.close()
             except Exception as e:
                 logger.error(f"检查器运行错误: {e}")
             time.sleep(self.check_interval)
@@ -1020,6 +1052,8 @@ class TariBlockChecker(threading.Thread):
     def stop(self):
         """停止检查器"""
         self.running = False
+        if self.db_pool:
+            asyncio.run(self.db_pool.close())
         
 
 # 修改主函数
