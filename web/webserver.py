@@ -6,6 +6,8 @@ from datetime import datetime
 import json
 import os
 import logging
+import threading
+import time
 
 # 配置日志
 logging.basicConfig(
@@ -370,6 +372,70 @@ def init_db():
     conn.commit()
     cur.close()
     conn.close()
+
+def record_hashrate_history():
+    while True:
+        try:
+            cursor = conn.cursor()
+            
+            # 获取当前总算力
+            cursor.execute("""
+                SELECT SUM(hashrate) as total_hashrate
+                FROM miners
+                WHERE last_seen > datetime('now', '-5 minutes')
+            """)
+            total_hashrate = cursor.fetchone()[0] or 0
+            
+            # 记录算力历史
+            cursor.execute("""
+                INSERT INTO hashrate_history (timestamp, hashrate)
+                VALUES (datetime('now'), ?)
+            """, (total_hashrate,))
+            
+            conn.commit()
+            cursor.close()
+            
+            logger.info(f"记录算力历史数据: {total_hashrate/1000:.2f} KH/s")
+            
+        except Exception as e:
+            logger.error(f"记录算力历史数据失败: {str(e)}")
+        
+        # 每5分钟记录一次
+        time.sleep(300)
+
+# 启动算力历史记录线程
+hashrate_thread = threading.Thread(target=record_hashrate_history, daemon=True)
+hashrate_thread.start()
+
+@app.route('/api/hashrate/history')
+def get_hashrate_history():
+    try:
+        # 获取查询参数
+        hours = request.args.get('hours', default=24, type=int)  # 默认显示24小时
+        
+        cursor = conn.cursor()
+        
+        # 计算时间范围
+        cursor.execute("""
+            SELECT timestamp, hashrate
+            FROM hashrate_history
+            WHERE timestamp >= datetime('now', ? || ' hours')
+            ORDER BY timestamp ASC
+        """, (-hours,))
+        
+        history = cursor.fetchall()
+        cursor.close()
+        
+        return jsonify({
+            'history': [{
+                'timestamp': record[0],
+                'hashrate': record[1]
+            } for record in history]
+        })
+        
+    except Exception as e:
+        logger.error(f"获取算力历史数据失败: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=80, debug=True) 
