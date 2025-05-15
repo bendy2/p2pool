@@ -381,16 +381,16 @@ def record_hashrate_history():
             
             # 获取当前总算力
             cursor.execute("""
-                SELECT SUM(hashrate) as total_hashrate
+                SELECT COALESCE(SUM(hashrate), 0) as total_hashrate
                 FROM miners
-                WHERE last_seen > datetime('now', '-5 minutes')
+                WHERE last_seen > NOW() - INTERVAL '5 minutes'
             """)
-            total_hashrate = cursor.fetchone()[0] or 0
+            total_hashrate = cursor.fetchone()[0]
             
             # 记录算力历史
             cursor.execute("""
                 INSERT INTO hashrate_history (timestamp, hashrate)
-                VALUES (datetime('now'), ?)
+                VALUES (NOW(), %s)
             """, (total_hashrate,))
             
             conn.commit()
@@ -423,16 +423,17 @@ def get_hashrate_history():
         cursor.execute("""
             SELECT timestamp, hashrate
             FROM hashrate_history
-            WHERE timestamp >= datetime('now', ? || ' hours')
+            WHERE timestamp >= NOW() - INTERVAL '%s hours'
             ORDER BY timestamp ASC
-        """, (-hours,))
+        """, (hours,))
         
         history = cursor.fetchall()
         cursor.close()
+        conn.close()
         
         return jsonify({
             'history': [{
-                'timestamp': record[0],
+                'timestamp': record[0].isoformat(),
                 'hashrate': record[1]
             } for record in history]
         })
