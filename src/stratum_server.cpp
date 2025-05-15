@@ -423,10 +423,10 @@ bool StratumServer::on_submit(StratumClient* client, uint32_t id, const char* jo
 		if (curl) {
 			const char* username = client->m_customUser;
 			if (username[0] != '\0') {
-				// 构建JSON-RPC请求
-				char json_request[512];
-				snprintf(json_request, sizeof(json_request), 
-					"{\"jsonrpc\":\"2.0\",\"id\":\"0\",\"method\":\"submit\",\"params\":{\"username\":\"%s\"}}", 
+			// 构建JSON-RPC请求
+			char json_request[512];
+			snprintf(json_request, sizeof(json_request), 
+				"{\"jsonrpc\":\"2.0\",\"id\":\"0\",\"method\":\"submit\",\"params\":{\"username\":\"%s\"}}", 
 					username);
 				
 				struct curl_slist* headers = curl_slist_append(nullptr, "Content-Type: application/json");
