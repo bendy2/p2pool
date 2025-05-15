@@ -739,6 +739,15 @@ def init_database():
             )
         """)
         
+        # 创建算力历史记录表
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS hashrate_history (
+                id SERIAL PRIMARY KEY,
+                timestamp TIMESTAMP NOT NULL,
+                hashrate BIGINT NOT NULL
+            )
+        """)
+        
         conn.commit()
         logger.info("数据库表结构初始化成功")
         
@@ -1218,4 +1227,57 @@ def get_user_payments(username):
         return jsonify({'error': '获取用户支付历史失败'}), 500
     finally:
         cur.close()
-        conn.close() 
+        conn.close()
+
+# 添加定时任务来记录算力数据
+def record_hashrate():
+    """记录当前算力数据"""
+    try:
+        # 从webserver获取当前算力数据
+        stratum_data = read_stratum_data()
+        if not stratum_data:
+            return
+            
+        # 获取总算力
+        total_hashrate = stratum_data.get('hashrate_15m', 0)
+        
+        # 记录到数据库
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        cur.execute("""
+            INSERT INTO hashrate_history (timestamp, hashrate)
+            VALUES (%s, %s)
+        """, (datetime.now(), total_hashrate))
+        
+        conn.commit()
+        logger.info(f"记录算力数据: {total_hashrate}H/s")
+        
+    except Exception as e:
+        logger.error(f"记录算力数据失败: {str(e)}")
+    finally:
+        cur.close()
+        conn.close()
+
+# 创建定时任务线程
+class HashrateRecorder(threading.Thread):
+    def __init__(self):
+        super().__init__()
+        self.daemon = True
+        self.running = True
+        self.interval = 300  # 5分钟记录一次
+        
+    def run(self):
+        while self.running:
+            try:
+                record_hashrate()
+            except Exception as e:
+                logger.error(f"记录算力数据时发生错误: {str(e)}")
+            time.sleep(self.interval)
+            
+    def stop(self):
+        self.running = False
+
+# 在应用启动时启动算力记录器
+hashrate_recorder = HashrateRecorder()
+hashrate_recorder.start() 

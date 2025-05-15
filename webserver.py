@@ -115,4 +115,34 @@ def get_user_hashrate(username):
             
     except Exception as e:
         logger.error(f"获取用户算力失败: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/hashrate/history')
+def get_hashrate_history():
+    try:
+        # 获取查询参数
+        hours = request.args.get('hours', default=24, type=int)  # 默认显示24小时
+        
+        cursor = conn.cursor()
+        
+        # 计算时间范围
+        cursor.execute("""
+            SELECT timestamp, hashrate
+            FROM hashrate_history
+            WHERE timestamp >= datetime('now', ? || ' hours')
+            ORDER BY timestamp ASC
+        """, (-hours,))
+        
+        history = cursor.fetchall()
+        cursor.close()
+        
+        return jsonify({
+            'history': [{
+                'timestamp': record[0],
+                'hashrate': record[1]
+            } for record in history]
+        })
+        
+    except Exception as e:
+        logger.error(f"获取算力历史数据失败: {str(e)}")
         return jsonify({'error': str(e)}), 500 

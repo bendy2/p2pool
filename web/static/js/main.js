@@ -172,4 +172,79 @@ setInterval(updatePoolStatus, 10000);
 
 // 页面加载时立即更新一次
 updateBlocks();
-updatePoolStatus(); 
+updatePoolStatus();
+
+// 初始化算力走势图
+function initHashrateChart() {
+    const ctx = document.getElementById('hashrateChart').getContext('2d');
+    const chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [{
+                label: '矿池算力',
+                data: [],
+                borderColor: 'rgb(54, 162, 235)',
+                tension: 0.1
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                title: {
+                    display: true,
+                    text: '矿池算力走势图'
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: '算力 (H/s)'
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: '时间'
+                    }
+                }
+            }
+        }
+    });
+    return chart;
+}
+
+// 更新算力走势图
+function updateHashrateChart(chart) {
+    fetch('/api/hashrate/history')
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                console.error('获取算力历史数据失败:', data.error);
+                return;
+            }
+
+            const history = data.history;
+            const timestamps = history.map(h => formatTime(h.timestamp));
+            const hashrateData = history.map(h => h.hashrate);
+
+            chart.data.labels = timestamps;
+            chart.data.datasets[0].data = hashrateData;
+            chart.update();
+        })
+        .catch(error => console.error('更新算力走势图失败:', error));
+}
+
+// 页面加载完成后执行
+document.addEventListener('DOMContentLoaded', function() {
+    // 初始化算力走势图
+    const hashrateChart = initHashrateChart();
+    
+    // 立即更新一次数据
+    updateHashrateChart(hashrateChart);
+    
+    // 每5分钟更新一次数据
+    setInterval(() => updateHashrateChart(hashrateChart), 5 * 60 * 1000);
+}); 
