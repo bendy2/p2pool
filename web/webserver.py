@@ -59,12 +59,7 @@ def read_stratum_data():
             }
     except Exception as e:
         logger.error(f"读取stratum数据失败: {str(e)}")
-        return {
-            'hashrate_15m': 0,
-            'hashrate_1h': 0,
-            'hashrate_24h': 0,
-            'workers': []
-        }
+        return None
 
 def get_user_hashrate(username):
     stratum_data = read_stratum_data()
@@ -376,18 +371,19 @@ def init_db():
 def record_hashrate_history():
     while True:
         try:
+            # 从stratum文件读取算力数据
+            stratum_data = read_stratum_data()
+            if not stratum_data:
+                time.sleep(300)
+                continue
+                
+            # 获取15分钟平均算力
+            total_hashrate = stratum_data.get('hashrate_15m', 0)
+            
+            # 记录到数据库
             conn = get_db_connection()
             cursor = conn.cursor()
             
-            # 获取当前总算力
-            cursor.execute("""
-                SELECT COALESCE(SUM(hashrate), 0) as total_hashrate
-                FROM miners
-                WHERE last_seen > NOW() - INTERVAL '5 minutes'
-            """)
-            total_hashrate = cursor.fetchone()[0]
-            
-            # 记录算力历史
             cursor.execute("""
                 INSERT INTO hashrate_history (timestamp, hashrate)
                 VALUES (NOW(), %s)

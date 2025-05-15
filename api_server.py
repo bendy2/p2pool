@@ -1215,73 +1215,6 @@ def get_user_payments(username):
         cur.close()
         conn.close()
 
-# 添加定时任务来记录算力数据
-def read_stratum_data():
-    try:
-        with open('./web/api/local/stratum', 'r') as f:  # 修改路径
-            data = json.load(f)
-            return {
-                'hashrate_15m': data.get('hashrate_15m', 0),
-                'hashrate_1h': data.get('hashrate_1h', 0),
-                'hashrate_24h': data.get('hashrate_24h', 0),
-                'workers': data.get('workers', [])
-            }
-    except Exception as e:
-        logger.error(f"读取stratum数据失败: {str(e)}")
-        return None
-
-def record_hashrate():
-    """记录当前算力数据"""
-    conn = None
-    cur = None
-    try:
-        # 从webserver获取当前算力数据
-        stratum_data = read_stratum_data()
-        if not stratum_data:
-            return
-            
-        # 获取总算力
-        total_hashrate = stratum_data.get('hashrate_15m', 0)
-        
-        # 记录到数据库
-        conn = get_db_connection()
-        cur = conn.cursor()
-        
-        cur.execute("""
-            INSERT INTO hashrate_history (timestamp, hashrate)
-            VALUES (%s, %s)
-        """, (datetime.now(), total_hashrate))
-        
-        conn.commit()
-        logger.info(f"记录算力数据: {total_hashrate}H/s")
-        
-    except Exception as e:
-        logger.error(f"记录算力数据失败: {str(e)}")
-    finally:
-        if cur:
-            cur.close()
-        if conn:
-            conn.close()
-
-# 创建定时任务线程
-class HashrateRecorder(threading.Thread):
-    def __init__(self):
-        super().__init__()
-        self.daemon = True
-        self.running = True
-        self.interval = 300  # 5分钟记录一次
-        
-    def run(self):
-        while self.running:
-            try:
-                record_hashrate()
-            except Exception as e:
-                logger.error(f"记录算力数据时发生错误: {str(e)}")
-            time.sleep(self.interval)
-            
-    def stop(self):
-        self.running = False
-
 # 在 main 函数中添加检查器的启动代码
 if __name__ == '__main__':
     logger.info("Starting API server...")
@@ -1289,8 +1222,6 @@ if __name__ == '__main__':
         # 启动 Tari 区块检查器
         tari_checker = TariBlockChecker(config['database'])
         tari_checker.start()
-        hashrate_recorder = HashrateRecorder()
-        hashrate_recorder.start() 
         
         # 启动 API 服务器
         app.run(host='0.0.0.0', port=5000)
