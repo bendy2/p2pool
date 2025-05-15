@@ -65,10 +65,10 @@ function updateRewardsList(rewards) {
     rewards.forEach(reward => {
         const row = document.createElement('tr');
         row.innerHTML = `
-            <td>${formatTime(reward.time)}</td>
-            <td>${reward.block_height}</td>
+            <td>${formatTime(reward.timestamp)}</td>
+            <td>${reward.height}</td>
             <td>${reward.type.toUpperCase()}</td>
-            <td>${reward.type === 'xmr' ? formatXMR(reward.reward) : formatTARI(reward.reward)}</td>
+            <td>${reward.type === 'xmr' ? formatXMR(reward.amount) : formatTARI(reward.amount)}</td>
             <td>${reward.shares}</td>
         `;
         tbody.appendChild(row);
@@ -83,8 +83,8 @@ function updatePaymentsList(payments) {
     payments.forEach(payment => {
         const row = document.createElement('tr');
         row.innerHTML = `
-            <td>${formatTime(payment.time)}</td>
-            <td>${payment.tx_id || '-'}</td>
+            <td>${formatTime(payment.timestamp)}</td>
+            <td>${payment.txid || '-'}</td>
             <td>${payment.type.toUpperCase()}</td>
             <td>${payment.type === 'xmr' ? formatXMR(payment.amount) : formatTARI(payment.amount)}</td>
         `;
@@ -107,11 +107,11 @@ function updateUserInfo() {
             document.getElementById('username').textContent = data.username;
             document.getElementById('created-at').textContent = formatTime(data.created_at);
             document.getElementById('current-hashrate').textContent = formatHashrate(data.current_hashrate);
-            document.getElementById('user-fee').textContent = (data.fee * 100).toFixed(2) + '%';
+            document.getElementById('user-fee').textContent = formatFee(data.fee);
             
             // 更新钱包地址
-            document.getElementById('xmr-wallet').textContent = data.xmr_wallet || '-';
-            document.getElementById('tari-wallet').textContent = data.tari_wallet || '-';
+            document.getElementById('xmr-wallet').textContent = data.xmr_wallet || '未设置';
+            document.getElementById('tari-wallet').textContent = data.tari_wallet || '未设置';
             
             // 更新余额
             document.getElementById('xmr-balance').textContent = formatXMR(data.xmr_balance);
