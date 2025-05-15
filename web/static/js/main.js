@@ -190,6 +190,7 @@ function initHashrateChart() {
         },
         options: {
             responsive: true,
+            maintainAspectRatio: false,  // 允许自定义高度
             plugins: {
                 title: {
                     display: true,
