@@ -416,7 +416,7 @@ def get_hashrate_history():
     try:
         # 获取查询参数
         hours = request.args.get('hours', default=24, type=int)  # 默认显示24小时
-        
+        conn = get_db_connection()
         cursor = conn.cursor()
         
         # 计算时间范围
