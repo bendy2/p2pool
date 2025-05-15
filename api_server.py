@@ -1,10 +1,17 @@
-from flask import Flask, request, jsonify
+from fastapi import FastAPI, HTTPException, Depends
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from fastapi_limiter import FastAPILimiter
+from fastapi_limiter.depends import RateLimiter
+import asyncpg
+import aioredis
+import uvicorn
+from typing import Dict, Any, List
 import json
 import logging
 from datetime import datetime
+import asyncio
 import redis
-from typing import Dict, Any
-import os
 import psycopg2
 from psycopg2.extras import DictCursor
 import time
@@ -13,10 +20,14 @@ import subprocess
 import re
 from queue import Queue
 import requests
+import aiofiles
+import aioredis
+from functools import lru_cache
+from aiopg.pool import create_pool
 
 # 配置日志
 logging.basicConfig(
-    level=logging.DEBUG,  # 将默认日志级别改为 WARNING
+    level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
         logging.StreamHandler(),
@@ -26,14 +37,20 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
-# 设置第三方库的日志级别
-logging.getLogger('werkzeug').setLevel(logging.WARNING)  # Flask 的日志级别
-logging.getLogger('urllib3').setLevel(logging.WARNING)   # requests 的日志级别
+app = FastAPI()
 
-app = Flask(__name__)
+# 添加CORS中间件
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-# 用户统计信息字典
-user_stats = {}
+# 全局变量
+redis_client = None
+db_pool = None
 
 # 加载配置文件
 def load_config():
@@ -516,76 +533,41 @@ def handle_json_rpc(data):
             }
         }
 
-@app.route('/json_rpc', methods=['POST'])
-def json_rpc():
-    """处理JSON-RPC请求"""
+@app.post("/json_rpc")
+@rate_limit(limit=1000, period=60)  # 每分钟1000次请求
+async def handle_json_rpc(request: Dict[str, Any]):
     try:
-        # 获取请求数据
-        data = request.get_json()
-        
-        # 验证JSON-RPC 2.0请求格式
-        if not isinstance(data, dict):
-            return jsonify({
-                'jsonrpc': '2.0',
-                'error': {
-                    'code': -32700,
-                    'message': 'Parse error'
-                },
-                'id': None
-            })
-        
-        # 提取请求参数
-        method = data.get('method')
-        params = data.get('params', {})
-        request_id = data.get('id')
-        
-        # 验证必要字段
+        method = request.get('method')
+        params = request.get('params', {})
+        request_id = request.get('id')
+
         if not method:
-            return jsonify({
-                'jsonrpc': '2.0',
-                'error': {
-                    'code': -32600,
-                    'message': 'Invalid Request: method is required'
-                },
-                'id': request_id
-            })
-        
-        # 根据方法名调用相应的处理函数
+            raise HTTPException(status_code=400, detail="Method is required")
+
+        result = None
         if method == 'submit':
-            result = handle_submit(params)
-        #elif method == 'xmr_block':
-        #    #result = handle_xmr_block(params)
-        #elif method == 'tari_block':
-        #    #result = handle_tari_block(params)
+            result = await handle_submit(params)
         else:
-            return jsonify({
-                'jsonrpc': '2.0',
-                'error': {
-                    'code': -32601,
-                    'message': f'Method not found: {method}'
-                },
-                'id': request_id
-            })
-        
-        # 返回响应
-        response = {
+            raise HTTPException(status_code=404, detail=f"Method {method} not found")
+
+        return {
             'jsonrpc': '2.0',
-            'id': request_id
+            'id': request_id,
+            'result': result
         }
-        response.update(result)
-        
-        return jsonify(response)
-        
     except Exception as e:
-        logger.error(f"Error processing request: {str(e)}")
-        return jsonify({
-            'jsonrpc': '2.0',
-            'error': {
-                'code': -32000,
-                'message': f'Internal error: {str(e)}'
-            },
-            'id': request.get_json().get('id') if request.is_json else None
-        })
+        logger.error(f"Error handling JSON-RPC request: {str(e)}")
+        return JSONResponse(
+            status_code=500,
+            content={
+                'jsonrpc': '2.0',
+                'id': request.get('id'),
+                'error': {
+                    'code': -32000,
+                    'message': str(e)
+                }
+            }
+        )
 
 @app.route('/stats', methods=['GET'])
 def get_stats():
@@ -1212,7 +1194,15 @@ if __name__ == '__main__':
         tari_checker.start()
         
         # 启动 API 服务器
-        app.run(host='0.0.0.0', port=5000)
+        uvicorn.run(
+            "api_server:app",
+            host="0.0.0.0",
+            port=5000,
+            workers=4,  # 使用4个工作进程
+            loop="uvloop",  # 使用uvloop提高性能
+            limit_concurrency=1000,  # 限制并发连接数
+            backlog=2048  # 连接队列大小
+        )
     finally:
         # 确保在服务器关闭时停止所有线程
         log_monitor.stop()
