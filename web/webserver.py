@@ -69,9 +69,8 @@ def get_user_hashrate(username):
         try:
             # 解析worker数据: "IP:PORT,HASHRATE,SHARES,DIFFICULTY,USERNAME"
             parts = worker.split(',')
-            username = parts[4]
-            n = min(len(username), 10)
-            if len(parts) >= 5 and parts[4] == username:
+            check_str = username[:5]
+            if check_str in parts[4]:
                 total_hashrate += int(parts[3])
         except:
             continue
@@ -82,7 +81,7 @@ def get_user_hashrate(username):
 def get_active_miners():
     # 尝试从缓存获取
     cached_count = redis_client.get('cached:active_miners')
-    if cached_count is not None:
+    if cached_count is not None:11
         return int(cached_count)
     
     try:
