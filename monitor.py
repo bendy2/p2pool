@@ -13,9 +13,10 @@ from psycopg2 import pool
 # 配置日志
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    filename='monitor.log'  # 使用不同的日志文件
 )
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('monitor')  # 使用不同的日志记录器名称
 
 # 从配置文件加载数据库配置
 def load_config():
@@ -101,6 +102,8 @@ class TariBlockChecker(threading.Thread):
         self.daemon = True
         self.running = True
         self.check_interval = 60  # 检查间隔（秒）
+        self.max_retries = 3  # 最大重试次数
+        self.retry_delay = 1  # 重试延迟（秒）
 
     def buffer_to_hex(self, buffer_data):
         """将 Buffer 数据转换为十六进制字符串"""
@@ -161,48 +164,65 @@ class TariBlockChecker(threading.Thread):
         except Exception as e:
             logger.error(f"更新区块状态失败: {e}")
 
-    async def check_block(self):
+    def check_block(self):
         """检查一个区块"""
-        async with db_pool.getconn() as conn:
-            block = await conn.fetchrow("""
-                SELECT id, block_height, block_id 
-                FROM blocks 
-                WHERE check_status = false 
-                AND type = 'tari'
-                ORDER BY block_height ASC 
-                LIMIT 1
-            """)
-            
-            if not block:
-                logger.info("没有需要检查的区块")
-                return
-                
-            block_hash = block['block_id']
-            logger.info(f"开始检查区块 {block['block_height']}")
-            
-            api_data = await self.get_block_from_api(block['block_height'])
-            
-            if not api_data:
-                logger.info(f"远程未找到区块 {block['block_height']}，跳过")
-                return
-
+        conn = None
+        for attempt in range(self.max_retries):
             try:
-                header = api_data.get('header', {})
-                remote_hash = self.buffer_to_hex(header.get('hash', {}))
-                
-                if not remote_hash or remote_hash != block_hash:
-                    logger.warning(f"区块 {block['block_height']} 远程哈希无效")
-                    await self.handle_invalid_block(block['id'], block['block_height'])
-                    return
+                conn = get_db_connection()  # 使用新的连接获取函数
+                with conn.cursor() as cur:
+                    block = await conn.fetchrow("""
+                        SELECT id, block_height, block_id 
+                        FROM blocks 
+                        WHERE check_status = false 
+                        AND type = 'tari'
+                        ORDER BY block_height ASC 
+                        LIMIT 1
+                    """)
+                    
+                    if not block:
+                        logger.info("没有需要检查的区块")
+                        return
+                        
+                    block_hash = block['block_id']
+                    logger.info(f"开始检查区块 {block['block_height']}")
+                    
+                    api_data = await self.get_block_from_api(block['block_height'])
+                    
+                    if not api_data:
+                        logger.info(f"远程未找到区块 {block['block_height']}，跳过")
+                        return
 
-                # 更新区块状态
-                await self.update_block_status(block['id'], True, remote_hash)
-                logger.info(f"区块 {block['block_height']} 验证成功")
+                    try:
+                        header = api_data.get('header', {})
+                        remote_hash = self.buffer_to_hex(header.get('hash', {}))
+                        
+                        if not remote_hash or remote_hash != block_hash:
+                            logger.warning(f"区块 {block['block_height']} 远程哈希无效")
+                            await self.handle_invalid_block(block['id'], block['block_height'])
+                            return
 
+                        # 更新区块状态
+                        await self.update_block_status(block['id'], True, remote_hash)
+                        logger.info(f"区块 {block['block_height']} 验证成功")
+
+                    except Exception as e:
+                        logger.error(f"检查区块 {block['block_height']} 时发生错误: {e}")
+                        # 如果发生错误，将区块标记为无效
+                        await self.handle_invalid_block(block['id'], block['block_height'])
+                break  # 如果成功，跳出重试循环
             except Exception as e:
-                logger.error(f"检查区块 {block['block_height']} 时发生错误: {e}")
-                # 如果发生错误，将区块标记为无效
-                await self.handle_invalid_block(block['id'], block['block_height'])
+                logger.error(f"检查区块时出错 (尝试 {attempt + 1}/{self.max_retries}): {str(e)}")
+                if attempt < self.max_retries - 1:
+                    time.sleep(self.retry_delay)
+                else:
+                    raise
+            finally:
+                if conn:
+                    try:
+                        db_pool.putconn(conn)
+                    except Exception as e:
+                        logger.error(f"释放数据库连接时出错: {str(e)}")
 
     async def handle_invalid_block(self, block_id, block_height):
         """处理无效区块"""
@@ -255,7 +275,7 @@ class TariBlockChecker(threading.Thread):
         """运行检查器"""
         while self.running:
             try:
-                asyncio.run(self.check_block())
+                self.check_block()
             except Exception as e:
                 logger.error(f"检查器运行错误: {e}")
             time.sleep(self.check_interval)
@@ -269,20 +289,41 @@ def init_db():
     global db_pool
     try:
         db_pool = pool.ThreadedConnectionPool(
-            minconn=1,
-            maxconn=10,
-            **DB_CONFIG
+            minconn=5,  # 增加最小连接数
+            maxconn=20,  # 增加最大连接数
+            **DB_CONFIG,
+            name='monitor_pool'
         )
         logger.info("Successfully connected to database")
     except Exception as e:
         logger.error(f"Database connection failed: {str(e)}")
         raise
 
+def get_db_connection():
+    """获取数据库连接，带重试机制"""
+    max_retries = 3
+    retry_delay = 1  # 秒
+    
+    for attempt in range(max_retries):
+        try:
+            conn = db_pool.getconn()
+            return conn
+        except pool.PoolError as e:
+            if attempt < max_retries - 1:
+                logger.warning(f"获取数据库连接失败，尝试重试 ({attempt + 1}/{max_retries})")
+                time.sleep(retry_delay)
+            else:
+                logger.error("数据库连接池耗尽，无法获取连接")
+                raise
+        except Exception as e:
+            logger.error(f"获取数据库连接时发生错误: {str(e)}")
+            raise
+
 def handle_xmr_block(block_data):
     """处理 XMR 区块数据"""
     conn = None
     try:
-        conn = db_pool.getconn()  # 使用 getconn() 而不是 acquire()
+        conn = get_db_connection()  # 使用新的连接获取函数
         with conn.cursor() as cur:
             # 检查区块是否已存在
             cur.execute("""
@@ -348,13 +389,16 @@ def handle_xmr_block(block_data):
             conn.rollback()
     finally:
         if conn:
-            db_pool.putconn(conn)  # 使用 putconn() 而不是 release()
+            try:
+                db_pool.putconn(conn)
+            except Exception as e:
+                logger.error(f"释放数据库连接时出错: {str(e)}")
 
 def handle_tari_block(block_data):
     """处理 TARI 区块数据"""
     conn = None
     try:
-        conn = db_pool.getconn()  # 使用 getconn() 而不是 acquire()
+        conn = get_db_connection()  # 使用新的连接获取函数
         with conn.cursor() as cur:
             # 检查区块是否已存在
             cur.execute("""
@@ -420,7 +464,10 @@ def handle_tari_block(block_data):
             conn.rollback()
     finally:
         if conn:
-            db_pool.putconn(conn)  # 使用 putconn() 而不是 release()
+            try:
+                db_pool.putconn(conn)
+            except Exception as e:
+                logger.error(f"释放数据库连接时出错: {str(e)}")
 
 async def main():
     """主函数"""

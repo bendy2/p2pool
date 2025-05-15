@@ -182,9 +182,8 @@ class XMRPayment:
                 address = payment['wallet']
             
             # 转换为atomic units
-            atomic_amount = int(amount * Decimal('1e12'))
+                atomic_amount = int(amount * Decimal('1e12'))
                 total_amount += amount
-                
                 destinations.append({
                     "amount": atomic_amount,
                     "address": address
