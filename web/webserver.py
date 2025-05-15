@@ -376,6 +376,7 @@ def init_db():
 def record_hashrate_history():
     while True:
         try:
+            conn = get_db_connection()
             cursor = conn.cursor()
             
             # 获取当前总算力
@@ -394,11 +395,14 @@ def record_hashrate_history():
             
             conn.commit()
             cursor.close()
+            conn.close()
             
             logger.info(f"记录算力历史数据: {total_hashrate/1000:.2f} KH/s")
             
         except Exception as e:
             logger.error(f"记录算力历史数据失败: {str(e)}")
+            if 'conn' in locals():
+                conn.close()
         
         # 每5分钟记录一次
         time.sleep(300)
