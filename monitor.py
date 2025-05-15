@@ -15,11 +15,7 @@ import requests
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    filename='monitor.log',  # 使用不同的日志文件
-    handlers=[
-        logging.FileHandler('monitor.log'),
-        logging.StreamHandler()
-    ]
+    filename='aamo333nitor.log',  # 使用不同的日志文件
 )
 logger = logging.getLogger('monitor')  # 使用不同的日志记录器名称
 
