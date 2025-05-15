@@ -69,6 +69,7 @@ def get_user_hashrate(username):
         try:
             # 解析worker数据: "IP:PORT,HASHRATE,SHARES,DIFFICULTY,USERNAME"
             parts = worker.split(',')
+            username = parts[4]
             n = min(len(username), 10)
             if len(parts) >= 5 and parts[4] == username:
                 total_hashrate += int(parts[3])
