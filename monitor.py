@@ -140,38 +140,49 @@ class TariBlockChecker(threading.Thread):
             logger.error(f"处理 API 响应时发生未知错误: {e}")
             return None
 
-    async def update_block_status(self, block_id, is_valid, remote_hash=None):
+    def update_block_status(self, block_id, is_valid, remote_hash=None):
         """更新区块状态"""
+        conn = None
         try:
-            async with db_pool.getconn() as conn:
+            conn = get_db_connection()
+            with conn.cursor() as cur:
                 if is_valid:
-                    await conn.execute("""
+                    cur.execute("""
                         UPDATE blocks 
                         SET check_status = true, 
                             is_valid = true
-                        WHERE id = $1
-                    """, block_id)
+                        WHERE id = %s
+                    """, (block_id,))
                 else:
-                    await conn.execute("""
+                    cur.execute("""
                         UPDATE blocks 
                         SET check_status = true, 
                             is_valid = false
-                        WHERE id = $1
-                    """, block_id)
+                        WHERE id = %s
+                    """, (block_id,))
+                conn.commit()
                 
                 logger.info(f"区块 {block_id} 状态已更新: is_valid={is_valid} remote_hash={remote_hash}")
                 
         except Exception as e:
             logger.error(f"更新区块状态失败: {e}")
+            if conn:
+                conn.rollback()
+        finally:
+            if conn:
+                try:
+                    db_pool.putconn(conn)
+                except Exception as e:
+                    logger.error(f"释放数据库连接时出错: {str(e)}")
 
     def check_block(self):
         """检查一个区块"""
         conn = None
         for attempt in range(self.max_retries):
             try:
-                conn = get_db_connection()  # 使用新的连接获取函数
+                conn = get_db_connection()
                 with conn.cursor() as cur:
-                    block = await conn.fetchrow("""
+                    cur.execute("""
                         SELECT id, block_height, block_id 
                         FROM blocks 
                         WHERE check_status = false 
@@ -179,18 +190,19 @@ class TariBlockChecker(threading.Thread):
                         ORDER BY block_height ASC 
                         LIMIT 1
                     """)
+                    block = cur.fetchone()
                     
                     if not block:
                         logger.info("没有需要检查的区块")
                         return
                         
-                    block_hash = block['block_id']
-                    logger.info(f"开始检查区块 {block['block_height']}")
+                    block_id, block_height, block_hash = block
+                    logger.info(f"开始检查区块 {block_height}")
                     
-                    api_data = await self.get_block_from_api(block['block_height'])
+                    api_data = self.get_block_from_api(block_height)
                     
                     if not api_data:
-                        logger.info(f"远程未找到区块 {block['block_height']}，跳过")
+                        logger.info(f"远程未找到区块 {block_height}，跳过")
                         return
 
                     try:
@@ -198,19 +210,19 @@ class TariBlockChecker(threading.Thread):
                         remote_hash = self.buffer_to_hex(header.get('hash', {}))
                         
                         if not remote_hash or remote_hash != block_hash:
-                            logger.warning(f"区块 {block['block_height']} 远程哈希无效")
-                            await self.handle_invalid_block(block['id'], block['block_height'])
+                            logger.warning(f"区块 {block_height} 远程哈希无效")
+                            self.handle_invalid_block(block_id, block_height)
                             return
 
                         # 更新区块状态
-                        await self.update_block_status(block['id'], True, remote_hash)
-                        logger.info(f"区块 {block['block_height']} 验证成功")
+                        self.update_block_status(block_id, True, remote_hash)
+                        logger.info(f"区块 {block_height} 验证成功")
 
                     except Exception as e:
-                        logger.error(f"检查区块 {block['block_height']} 时发生错误: {e}")
+                        logger.error(f"检查区块 {block_height} 时发生错误: {e}")
                         # 如果发生错误，将区块标记为无效
-                        await self.handle_invalid_block(block['id'], block['block_height'])
-                break  # 如果成功，跳出重试循环
+                        self.handle_invalid_block(block_id, block_height)
+                    
             except Exception as e:
                 logger.error(f"检查区块时出错 (尝试 {attempt + 1}/{self.max_retries}): {str(e)}")
                 if attempt < self.max_retries - 1:
@@ -224,52 +236,72 @@ class TariBlockChecker(threading.Thread):
                     except Exception as e:
                         logger.error(f"释放数据库连接时出错: {str(e)}")
 
-    async def handle_invalid_block(self, block_id, block_height):
+    def handle_invalid_block(self, block_id, block_height):
         """处理无效区块"""
+        conn = None
         try:
-            async with db_pool.getconn() as conn:
-                async with conn.transaction():
+            conn = get_db_connection()
+            with conn.cursor() as cur:
+                # 开始事务
+                cur.execute("BEGIN")
+                
+                try:
                     # 1. 更新区块状态为无效
-                    await conn.execute("""
+                    cur.execute("""
                         UPDATE blocks 
                         SET check_status = true, 
                             is_valid = false
-                        WHERE id = $1
-                    """, block_id)
+                        WHERE id = %s
+                    """, (block_id,))
                     
                     # 2. 获取该区块的所有奖励记录
-                    rewards = await conn.fetch("""
+                    cur.execute("""
                         SELECT username, reward, type
                         FROM rewards 
-                        WHERE block_height = $1
-                    """, block_height)
+                        WHERE block_height = %s
+                    """, (block_height,))
+                    rewards = cur.fetchall()
                     
                     # 3. 回滚用户余额
                     for reward in rewards:
-                        if reward['type'] == 'tari':
-                            await conn.execute("""
+                        username, reward_amount, reward_type = reward
+                        if reward_type == 'tari':
+                            cur.execute("""
                                 UPDATE account 
-                                SET tari_balance = tari_balance - $1
-                                WHERE username = $2
-                            """, reward['reward'], reward['username'])
-                        elif reward['type'] == 'xmr':
-                            await conn.execute("""
+                                SET tari_balance = tari_balance - %s
+                                WHERE username = %s
+                            """, (reward_amount, username))
+                        elif reward_type == 'xmr':
+                            cur.execute("""
                                 UPDATE account 
-                                SET xmr_balance = xmr_balance - $1
-                                WHERE username = $2
-                            """, reward['reward'], reward['username'])
+                                SET xmr_balance = xmr_balance - %s
+                                WHERE username = %s
+                            """, (reward_amount, username))
                     
                     # 4. 删除奖励记录
-                    await conn.execute("""
+                    cur.execute("""
                         UPDATE rewards 
                         SET reward = 0
-                        WHERE block_height = $1
-                    """, block_height)
+                        WHERE block_height = %s
+                    """, (block_height,))
                     
+                    # 提交事务
+                    cur.execute("COMMIT")
                     logger.info(f"区块 {block_height} 已标记为无效并清理相关数据")
                     
+                except Exception as e:
+                    # 回滚事务
+                    cur.execute("ROLLBACK")
+                    raise e
+                
         except Exception as e:
             logger.error(f"处理无效区块 {block_height} 时发生错误: {e}")
+        finally:
+            if conn:
+                try:
+                    db_pool.putconn(conn)
+                except Exception as e:
+                    logger.error(f"释放数据库连接时出错: {str(e)}")
 
     def run(self):
         """运行检查器"""
