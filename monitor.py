@@ -14,7 +14,11 @@ from psycopg2 import pool
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    filename='monitor.log'  # 使用不同的日志文件
+    filename='monitor.log',  # 使用不同的日志文件
+    handlers=[
+        logging.FileHandler('monitor.log'),
+        logging.StreamHandler()
+    ]
 )
 logger = logging.getLogger('monitor')  # 使用不同的日志记录器名称
 
@@ -501,33 +505,66 @@ def handle_tari_block(block_data):
             except Exception as e:
                 logger.error(f"释放数据库连接时出错: {str(e)}")
 
-async def main():
+def main():
     """主函数"""
+    log_monitor = None
+    block_checker = None
+    
     try:
         # 初始化数据库连接
         init_db()
+        logger.info("数据库连接初始化成功")
         
         # 创建并启动日志监控线程
         log_monitor = LogMonitorThread()
         log_monitor.start()
+        logger.info("日志监控线程已启动")
         
         # 创建并启动区块检查线程
         block_checker = TariBlockChecker()
         block_checker.start()
+        logger.info("区块检查线程已启动")
         
         # 保持程序运行
         while True:
-            await asyncio.sleep(1)
-            
+            try:
+                # 检查线程是否还在运行
+                if not log_monitor.is_alive():
+                    logger.error("日志监控线程已停止，重新启动...")
+                    log_monitor = LogMonitorThread()
+                    log_monitor.start()
+                
+                if not block_checker.is_alive():
+                    logger.error("区块检查线程已停止，重新启动...")
+                    block_checker = TariBlockChecker()
+                    block_checker.start()
+                
+                time.sleep(10)  # 每10秒检查一次线程状态
+                
+            except Exception as e:
+                logger.error(f"主循环发生错误: {str(e)}")
+                time.sleep(5)  # 发生错误时等待5秒后继续
+                
     except KeyboardInterrupt:
-        logger.info("正在关闭程序...")
-        log_monitor.stop()
-        block_checker.stop()
+        logger.info("收到终止信号，正在关闭程序...")
     except Exception as e:
         logger.error(f"程序运行错误: {str(e)}")
     finally:
+        # 确保正确关闭所有资源
+        if log_monitor:
+            log_monitor.stop()
+            log_monitor.join(timeout=5)
+            logger.info("日志监控线程已停止")
+            
+        if block_checker:
+            block_checker.stop()
+            block_checker.join(timeout=5)
+            logger.info("区块检查线程已停止")
+            
         if db_pool:
-            await db_pool.close()
+            db_pool.closeall()
+            logger.info("数据库连接池已关闭")
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    # 启动主程序
+    main()
