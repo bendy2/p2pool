@@ -1009,6 +1009,7 @@ class TariBlockChecker(threading.Thread):
             
             if not remote_hash or remote_hash != block_hash:
                 logger.warning(f"区块 {block[1]} 远程哈希无效")
+                self.handle_invalid_block(block[0], block[1])
                 return
 
             # 更新区块状态
@@ -1060,15 +1061,11 @@ class TariBlockChecker(threading.Thread):
             
             # 4. 删除奖励记录
             cur.execute("""
-                DELETE FROM rewards 
+                UPDATE rewards 
+                SET reward = 0
                 WHERE block_height = %s
             """, (block_height,))
             
-            # 5. 删除区块记录
-            cur.execute("""
-                DELETE FROM blocks 
-                WHERE id = %s
-            """, (block_id,))
             
             conn.commit()
             logger.info(f"区块 {block_height} 已标记为无效并清理相关数据")
