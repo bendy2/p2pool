@@ -121,25 +121,25 @@ class TariBlockChecker(threading.Thread):
             url = f'https://textexplore.tari.com/blocks/{height}?json'
             async with aiohttp.ClientSession() as session:
                 async with session.get(url, timeout=10) as response:
-                    response.raise_for_status()
-                    
-                    # 检查响应内容类型
-                    content_type = response.headers.get('content-type', '')
-                    if 'application/json' not in content_type:
-                        logger.warning(f"API 响应不是 JSON 格式: {content_type}")
-                        return None
-                        
-                    # 尝试解析 JSON
-                    try:
+            response.raise_for_status()
+            
+            # 检查响应内容类型
+            content_type = response.headers.get('content-type', '')
+            if 'application/json' not in content_type:
+                logger.warning(f"API 响应不是 JSON 格式: {content_type}")
+                return None
+                
+            # 尝试解析 JSON
+            try:
                         data = await response.json()
-                        if not data:
+                if not data:
                             logger.warning(f"API 返回空数据: {await response.text()[:100]}")
-                            return None
-                        return data
-                    except json.JSONDecodeError as e:
+                    return None
+                return data
+            except json.JSONDecodeError as e:
                         logger.warning(f"JSON 解析错误: {e}, 响应内容: {await response.text()[:100]}")
-                        return None
-                    
+                return None
+                
         except Exception as e:
             logger.error(f"处理 API 响应时发生未知错误: {e}")
             return None
@@ -150,24 +150,24 @@ class TariBlockChecker(threading.Thread):
         try:
             conn = get_db_connection()
             with conn.cursor() as cur:
-                if is_valid:
-                    cur.execute("""
-                        UPDATE blocks 
-                        SET check_status = true, 
-                            is_valid = true
-                        WHERE id = %s
-                    """, (block_id,))
-                else:
-                    cur.execute("""
-                        UPDATE blocks 
-                        SET check_status = true, 
-                            is_valid = false
-                        WHERE id = %s
-                    """, (block_id,))
-                conn.commit()
+            if is_valid:
+                cur.execute("""
+                    UPDATE blocks 
+                    SET check_status = true, 
+                        is_valid = true
+                    WHERE id = %s
+                """, (block_id,))
+            else:
+                cur.execute("""
+                    UPDATE blocks 
+                    SET check_status = true, 
+                        is_valid = false
+                    WHERE id = %s
+                """, (block_id,))
+            conn.commit()
                 
-                logger.info(f"区块 {block_id} 状态已更新: is_valid={is_valid} remote_hash={remote_hash}")
-                
+            logger.info(f"区块 {block_id} 状态已更新: is_valid={is_valid} remote_hash={remote_hash}")
+            
         except Exception as e:
             logger.error(f"更新区块状态失败: {e}")
             if conn:
@@ -184,47 +184,47 @@ class TariBlockChecker(threading.Thread):
         conn = None
         for attempt in range(self.max_retries):
             try:
-                conn = get_db_connection()
+        conn = get_db_connection()
                 with conn.cursor() as cur:
-                    cur.execute("""
-                        SELECT id, block_height, block_id 
-                        FROM blocks 
-                        WHERE check_status = false 
-                        AND type = 'tari'
-                        ORDER BY block_height ASC 
-                        LIMIT 1
-                    """)
-                    block = cur.fetchone()
+        cur.execute("""
+            SELECT id, block_height, block_id 
+            FROM blocks 
+            WHERE check_status = false 
+            AND type = 'tari'
+            ORDER BY block_height ASC 
+            LIMIT 1
+        """)
+        block = cur.fetchone()
                     
-                    if not block:
-                        logger.info("没有需要检查的区块")
-                        return
+        if not block:
+            logger.info("没有需要检查的区块")
+            return
                         
                     block_id, block_height, block_hash = block
                     logger.info(f"开始检查区块 {block_height}")
                     
                     api_data = self.get_block_from_api(block_height)
-                    
-                    if not api_data:
+        
+        if not api_data:
                         logger.info(f"远程未找到区块 {block_height}，跳过")
-                        return
+            return
 
-                    try:
-                        header = api_data.get('header', {})
-                        remote_hash = self.buffer_to_hex(header.get('hash', {}))
-                        
-                        if not remote_hash or remote_hash != block_hash:
+        try:
+            header = api_data.get('header', {})
+            remote_hash = self.buffer_to_hex(header.get('hash', {}))
+            
+            if not remote_hash or remote_hash != block_hash:
                             logger.warning(f"区块 {block_height} 远程哈希无效")
                             self.handle_invalid_block(block_id, block_height)
-                            return
+                return
 
-                        # 更新区块状态
+            # 更新区块状态
                         self.update_block_status(block_id, True, remote_hash)
                         logger.info(f"区块 {block_height} 验证成功")
 
-                    except Exception as e:
+        except Exception as e:
                         logger.error(f"检查区块 {block_height} 时发生错误: {e}")
-                        # 如果发生错误，将区块标记为无效
+            # 如果发生错误，将区块标记为无效
                         self.handle_invalid_block(block_id, block_height)
                     
             except Exception as e:
@@ -248,52 +248,52 @@ class TariBlockChecker(threading.Thread):
             with conn.cursor() as cur:
                 # 开始事务
                 cur.execute("BEGIN")
-                
+            
                 try:
-                    # 1. 更新区块状态为无效
-                    cur.execute("""
-                        UPDATE blocks 
-                        SET check_status = true, 
-                            is_valid = false
-                        WHERE id = %s
-                    """, (block_id,))
-                    
-                    # 2. 获取该区块的所有奖励记录
-                    cur.execute("""
-                        SELECT username, reward, type
-                        FROM rewards 
-                        WHERE block_height = %s
-                    """, (block_height,))
-                    rewards = cur.fetchall()
-                    
-                    # 3. 回滚用户余额
-                    for reward in rewards:
+            # 1. 更新区块状态为无效
+            cur.execute("""
+                UPDATE blocks 
+                SET check_status = true, 
+                    is_valid = false
+                WHERE id = %s
+            """, (block_id,))
+            
+            # 2. 获取该区块的所有奖励记录
+            cur.execute("""
+                SELECT username, reward, type
+                FROM rewards 
+                WHERE block_height = %s
+            """, (block_height,))
+            rewards = cur.fetchall()
+            
+            # 3. 回滚用户余额
+            for reward in rewards:
                         username, reward_amount, reward_type = reward
-                        if reward_type == 'tari':
-                            cur.execute("""
-                                UPDATE account 
-                                SET tari_balance = tari_balance - %s
-                                WHERE username = %s
-                            """, (reward_amount, username))
-                        elif reward_type == 'xmr':
-                            cur.execute("""
-                                UPDATE account 
-                                SET xmr_balance = xmr_balance - %s
-                                WHERE username = %s
-                            """, (reward_amount, username))
-                    
-                    # 4. 删除奖励记录
+                if reward_type == 'tari':
                     cur.execute("""
+                        UPDATE account 
+                        SET tari_balance = tari_balance - %s
+                        WHERE username = %s
+                            """, (reward_amount, username))
+                elif reward_type == 'xmr':
+                    cur.execute("""
+                        UPDATE account 
+                        SET xmr_balance = xmr_balance - %s
+                        WHERE username = %s
+                            """, (reward_amount, username))
+            
+            # 4. 删除奖励记录
+            cur.execute("""
                         UPDATE rewards 
                         SET reward = 0
-                        WHERE block_height = %s
-                    """, (block_height,))
-                    
+                WHERE block_height = %s
+            """, (block_height,))
+            
                     # 提交事务
                     cur.execute("COMMIT")
-                    logger.info(f"区块 {block_height} 已标记为无效并清理相关数据")
-                    
-                except Exception as e:
+            logger.info(f"区块 {block_height} 已标记为无效并清理相关数据")
+            
+        except Exception as e:
                     # 回滚事务
                     cur.execute("ROLLBACK")
                     raise e
@@ -362,7 +362,7 @@ def handle_xmr_block(block_data):
         conn = get_db_connection()  # 使用新的连接获取函数
         with conn.cursor() as cur:
             # 检查区块是否已存在
-            cur.execute("""
+        cur.execute("""
                 SELECT id FROM blocks 
                 WHERE block_height = %s AND type = 'xmr'
             """, (block_data['height'],))
@@ -418,7 +418,7 @@ def handle_xmr_block(block_data):
             
             conn.commit()
             logger.info(f"XMR 区块 {block_data['height']} 处理完成，区块ID: {block_id}")
-            
+        
     except Exception as e:
         logger.error(f"处理 XMR 区块时出错: {str(e)}")
         if conn:
@@ -447,7 +447,7 @@ def handle_tari_block(block_data):
                 return
                 
             # 插入新区块
-            cur.execute("""
+        cur.execute("""
                 INSERT INTO blocks (block_height, block_id, type, check_status, is_valid)
                 VALUES (%s, %s, 'tari', false, false)
                 RETURNING id
@@ -479,10 +479,10 @@ def handle_tari_block(block_data):
             for reward in rewards:
                 username, reward_amount, reward_type = reward
                 if reward_type == 'tari':
-                    cur.execute("""
+        cur.execute("""
                         UPDATE account 
                         SET tari_balance = tari_balance + %s
-                        WHERE username = %s
+            WHERE username = %s
                     """, (reward_amount, username))
                 elif reward_type == 'xmr':
                     cur.execute("""
@@ -493,7 +493,7 @@ def handle_tari_block(block_data):
             
             conn.commit()
             logger.info(f"TARI 区块 {block_data['height']} 处理完成，区块ID: {block_id}")
-            
+        
     except Exception as e:
         logger.error(f"处理 TARI 区块时出错: {str(e)}")
         if conn:
@@ -552,7 +552,7 @@ def main():
     finally:
         # 确保正确关闭所有资源
         if log_monitor:
-            log_monitor.stop()
+        log_monitor.stop()
             log_monitor.join(timeout=5)
             logger.info("日志监控线程已停止")
             
