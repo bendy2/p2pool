@@ -323,11 +323,19 @@ def init_db():
     """初始化数据库连接池"""
     global db_pool
     try:
+        # 移除 name 参数，只保留必要的数据库连接参数
+        db_config = {
+            'host': DB_CONFIG['host'],
+            'port': DB_CONFIG['port'],
+            'user': DB_CONFIG['user'],
+            'password': DB_CONFIG['password'],
+            'database': DB_CONFIG['database']
+        }
+        
         db_pool = pool.ThreadedConnectionPool(
-            minconn=5,  # 增加最小连接数
-            maxconn=20,  # 增加最大连接数
-            **DB_CONFIG,
-            name='monitor_pool'
+            minconn=5,
+            maxconn=20,
+            **db_config
         )
         logger.info("Successfully connected to database")
     except Exception as e:
