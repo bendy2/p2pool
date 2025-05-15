@@ -50,7 +50,7 @@ def confirm_action(message, interactive):
 class XMRPayment:
     def __init__(self, interactive=True):
         self.config = load_config()
-        self.min_payout = Decimal(str(self.config.get('min_payout', 0.1)))
+        self.min_payout = Decimal(str(self.config.get('min_payout', 0.01)))
         self.wallet_rpc_url = self.config.get('monero_wallet_rpc', 'http://127.0.0.1:18082/json_rpc')
         self.wallet_rpc_user = self.config.get('monero_wallet_rpc_user', '')
         self.wallet_rpc_password = self.config.get('monero_wallet_rpc_password', '')
@@ -69,19 +69,34 @@ class XMRPayment:
                 ORDER BY xmr_balance DESC
             """, (self.min_payout,))
             
-            pending_payments = cur.fetchall()
+            pending_payments = []
+            for username, balance, wallet in cur.fetchall():
+                # 将支付金额精确到小数点后3位
+                payment_amount = Decimal(str(int(balance * 1000) / 1000))
+                remaining_balance = balance - payment_amount
+                
+                pending_payments.append({
+                    'username': username,
+                    'total_balance': balance,
+                    'payment_amount': payment_amount,
+                    'remaining_balance': remaining_balance,
+                    'wallet': wallet
+                })
+            
             logger.info(f"找到 {len(pending_payments)} 个待支付用户")
             
             if self.interactive:
                 print("\n待支付用户列表:")
-                total_amount = Decimal('0')
-                for username, balance, wallet in pending_payments:
-                    print(f"用户: {username}")
-                    print(f"余额: {balance:.12f} XMR")
-                    print(f"钱包地址: {wallet}")
+                total_payment = Decimal('0')
+                for payment in pending_payments:
+                    print(f"用户: {payment['username']}")
+                    print(f"总余额: {payment['total_balance']:.12f} XMR")
+                    print(f"本次支付: {payment['payment_amount']:.3f} XMR")
+                    print(f"剩余余额: {payment['remaining_balance']:.12f} XMR")
+                    print(f"钱包地址: {payment['wallet']}")
                     print("-" * 50)
-                    total_amount += balance
-                print(f"\n总支付金额: {total_amount:.12f} XMR")
+                    total_payment += payment['payment_amount']
+                print(f"\n总支付金额: {total_payment:.3f} XMR")
                 
                 if not confirm_action("是否继续处理这些支付？", self.interactive):
                     logger.info("用户取消了支付处理")
@@ -147,16 +162,22 @@ class XMRPayment:
             logger.error(f"检查钱包余额失败: {str(e)}")
             return False
 
-    def process_payment(self, username, amount, address):
+    def process_payment(self, payment_info):
         """处理单个用户的支付"""
         try:
+            username = payment_info['username']
+            amount = payment_info['payment_amount']
+            address = payment_info['wallet']
+            
             # 转换为atomic units
             atomic_amount = int(amount * Decimal('1e12'))
             
             if self.interactive:
                 print(f"\n准备支付:")
                 print(f"用户: {username}")
-                print(f"金额: {amount:.12f} XMR")
+                print(f"总余额: {payment_info['total_balance']:.12f} XMR")
+                print(f"本次支付: {amount:.3f} XMR")
+                print(f"剩余余额: {payment_info['remaining_balance']:.12f} XMR")
                 print(f"地址: {address}")
                 
                 if not confirm_action("确认进行此笔支付？", self.interactive):
@@ -185,7 +206,7 @@ class XMRPayment:
                         return False
                 
                 self.record_payment(username, amount, tx_hash, fee)
-                logger.info(f"支付成功 - 用户: {username}, 金额: {amount} XMR, 交易哈希: {tx_hash}")
+                logger.info(f"支付成功 - 用户: {username}, 金额: {amount:.3f} XMR, 交易哈希: {tx_hash}")
                 return True
             else:
                 logger.error(f"支付失败 - 用户: {username}, 错误: {result.get('error', 'Unknown error')}")
@@ -202,11 +223,13 @@ class XMRPayment:
         try:
             cur.execute("BEGIN")
             
+            # 插入支付记录
             cur.execute("""
                 INSERT INTO payment (username, type, amount, txid, time)
                 VALUES (%s, 'xmr', %s, %s, %s)
             """, (username, amount, txid, datetime.now()))
             
+            # 更新用户余额（只减去实际支付的金额和手续费）
             cur.execute("""
                 UPDATE account 
                 SET xmr_balance = xmr_balance - %s 
@@ -236,19 +259,22 @@ class XMRPayment:
                 return
             
             # 计算总支付金额
-            total_amount = sum(balance for _, balance, _ in pending_payments)
+            total_amount = sum(payment['payment_amount'] for payment in pending_payments)
             
             # 检查钱包余额
             if not self.check_wallet_balance(total_amount):
                 return
             
             # 处理每个待支付用户
-            for username, balance, wallet_address in pending_payments:
+            for payment_info in pending_payments:
+                username = payment_info['username']
+                wallet_address = payment_info['wallet']
+                
                 if not wallet_address:
                     logger.warning(f"用户 {username} 没有设置钱包地址，跳过支付")
                     continue
                     
-                logger.info(f"正在处理用户 {username} 的支付，金额: {balance} XMR")
+                logger.info(f"正在处理用户 {username} 的支付，金额: {payment_info['payment_amount']:.3f} XMR")
                 
                 # 检查钱包地址格式
                 if not wallet_address.startswith('4'):
@@ -256,7 +282,7 @@ class XMRPayment:
                     continue
                 
                 # 处理支付
-                success = self.process_payment(username, balance, wallet_address)
+                success = self.process_payment(payment_info)
                 
                 if success:
                     logger.info(f"用户 {username} 的支付处理成功")
