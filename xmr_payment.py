@@ -82,7 +82,7 @@ class XMRPayment:
                 # 检查总金额是否超过1 XMR
                 if total_amount + payment_amount > Decimal('1'):
                     break
-                
+                    
                 pending_payments.append({
                     'username': username,
                     'total_balance': balance,
@@ -180,10 +180,11 @@ class XMRPayment:
                 username = payment['username']
                 amount = payment['payment_amount']
                 address = payment['wallet']
-            
-            # 转换为atomic units
+                
+                # 转换为atomic units
                 atomic_amount = int(amount * Decimal('1e12'))
                 total_amount += amount
+                
                 destinations.append({
                     "amount": atomic_amount,
                     "address": address
@@ -275,16 +276,16 @@ class XMRPayment:
         
         try:
             while True:
-            # 获取待支付列表
-            pending_payments = self.get_pending_payments()
-            
-            if not pending_payments:
-                logger.info("没有待支付的用户")
+                # 获取待支付列表
+                pending_payments = self.get_pending_payments()
+                
+                if not pending_payments:
+                    logger.info("没有待支付的用户")
                     break
-            
-            # 检查钱包余额
+                
+                # 检查钱包余额
                 total_amount = sum(payment['payment_amount'] for payment in pending_payments)
-            if not self.check_wallet_balance(total_amount):
+                if not self.check_wallet_balance(total_amount):
                     break
                 
                 # 处理合并支付
