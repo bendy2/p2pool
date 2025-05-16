@@ -250,22 +250,18 @@ class TariPayment:
                     exit()
                     continue
                 
-                target_id, address, amount, user_id = target
+                user_id, amount, wallet = target
                 
                 # 获取用户可用余额
                 available_balance = self.get_available_balance(user_id)
                 if available_balance <= 0:
                     logger.info(f"用户 {user_id} 可用余额不足，等待10秒后重试...")
                     time.sleep(10)
+                    exit()
                     continue
                 
-                # 检查余额是否足够
-                if amount > available_balance:
-                    logger.info(f"用户 {user_id} 余额不足，需要 {amount} TARI，可用 {available_balance} TARI")
-                    time.sleep(10)
-                    continue
-                
-                logger.info(f"开始处理用户 {user_id} 的支付目标: ID={target_id}, 地址={address}, 金额={amount}")
+                logger.info(f"开始处理用户 {user_id} 的支付目标: ID={user_id}, 地址={wallet}, 金额={amount}")
+                exit
                 
                 # 发送交易
                 txid = self.send_transaction(address, amount)
