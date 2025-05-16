@@ -141,17 +141,21 @@ class TariPayment:
             logger.info(f"开始发送交易到 {address}, 金额: {amount} TARI")
             
             # 创建转账请求
-            request = wallet_pb2.TransferRequest(
-                destinations=[{
-                    "address": address,
-                    "amount": int(amount * 1e6)  # 转换为最小单位
-                }],
-                priority=1,
-                ring_size=16
+            message = "payment from tpool"
+            recipient = wallet_pb2.PaymentRecipient(
+                address=address,
+                amount= int(amount * 1e6),
+                fee_per_gram=25,
+                payment_type=1,  # 使用单向支付类型
+                payment_id=message.encode('utf-8')  # 将消息作为 payment_id
+            )
+            # 创建转账请求
+            transfer_request = wallet_pb2.TransferRequest(
+                recipients=[recipient]  # 添加接收者到列表中
             )
             
             # 发送请求
-            response = self.stub.Transfer(request)
+            response = self.stub.Transfer(transfer_request)
             
             # 将响应对象转换为字典
             response_dict = MessageToDict(
