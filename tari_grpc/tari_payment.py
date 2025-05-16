@@ -139,7 +139,6 @@ class TariPayment:
         """发送交易"""
         try:
             logger.info(f"开始发送交易到 {address}, 金额: {amount} TARI")
-            
             # 创建转账请求
             message = "payment from tpool"
             recipient = wallet_pb2.PaymentRecipient(
@@ -233,7 +232,7 @@ class TariPayment:
         while True:
             try:
                 # 获取下一个支付目标
-                user_id = "12GiRMnB7vcFMvmoW1wdm7wyfvRnAuBRnjP4GaLuWrhb5NKuyxda3xQckhVJ4S4mPBvhoSfixTDk3BFMvVjmr166539"
+                user_id = "bendy"
                 address = "12GiRMnB7vcFMvmoW1wdm7wyfvRnAuBRnjP4GaLuWrhb5NKuyxda3xQckhVJ4S4mPBvhoSfixTDk3BFMvVjmr166539"
                 available_balance = 0.1
                 """
