@@ -98,42 +98,35 @@ class TariPayment:
             logger.error(f"获取支付目标失败: {str(e)}")
             return None
 
-    def record_payment(self, user_id, address, amount, tx_id, status, block_height):
-        """记录支付结果"""
+    def record_payment(self, username, amount, txid, fee):
+        """记录支付信息并更新用户余额"""
+        conn = get_db_connection()
+        cur = conn.cursor()
         try:
-            # 开始事务
-            self.conn.autocommit = False
-            try:
-                # 插入支付记录
-                self.cursor.execute('''
-                    INSERT INTO payment_records 
-                    (user_id, address, amount, tx_id, status, block_height, coin_type) 
-                    VALUES (%s, %s, %s, %s, %s, %s, 'tari')
-                ''', (user_id, address, amount, tx_id, status, block_height))
-                
-                # 如果支付成功，更新支付目标状态
-                if status == 1:
-                    self.cursor.execute('''
-                        UPDATE payment_targets 
-                        SET status = 1, updated_at = CURRENT_TIMESTAMP 
-                        WHERE address = %s AND user_id = %s AND coin_type = 'tari' AND status = 0
-                    ''', (address, user_id))
-                
-                # 提交事务
-                self.conn.commit()
-                logger.info(f"用户 {user_id} 支付记录已保存: 地址={address}, 金额={amount}, 状态={status}")
-                
-            except Exception as e:
-                # 回滚事务
-                self.conn.rollback()
-                logger.error(f"记录用户 {user_id} 支付结果失败: {str(e)}")
-                raise
-            finally:
-                # 恢复自动提交
-                self.conn.autocommit = True
-                
+            cur.execute("BEGIN")
+            
+            # 插入支付记录
+            cur.execute("""
+                INSERT INTO payment (username, type, amount, txid, time)
+                VALUES (%s, 'xmr', %s, %s, %s)
+            """, (username, amount, txid, datetime.now()))
+            
+            # 更新用户余额（只减去实际支付的金额和手续费）
+            cur.execute("""
+                UPDATE account 
+                SET xmr_balance = xmr_balance - %s 
+                WHERE username = %s
+            """, (amount + fee, username))
+            
+            conn.commit()
+            
         except Exception as e:
-            logger.error(f"记录用户 {user_id} 支付结果失败: {str(e)}")
+            conn.rollback()
+            logger.error(f"记录支付信息时出错: {str(e)}")
+            raise
+        finally:
+            cur.close()
+            conn.close()
 
     def send_transaction(self, address, amount):
         """发送交易"""
@@ -263,22 +256,22 @@ class TariPayment:
                 if txid:
                     # 等待交易确认
                     logger.info("等待交易确认...")
-                    time.sleep(5)
+                    time.sleep(10)
                     
                     # 检查交易状态
                     tx_info = self.check_transaction(txid)
                     print(tx_info);
-                    exit()
-                    if tx_info and tx_info.status == 1:  # 状态为1表示确认成功
+                    if tx_info and (
+                        tx_info.status == 1 or 
+                        tx_info.status == "TRANSACTION_STATUS_BROADCAST"
+                    ):  # 状态为1表示确认成功
                         logger.info(f"交易已确认，区块高度: {tx_info}")
                         # 记录支付结果
                         self.record_payment(
                             user_id,
-                            address, 
                             available_balance, 
                             txid, 
-                            1,  # 成功状态
-                            tx_info
+                            0
                         )
                     else:
                         logger.error("交易未确认")
