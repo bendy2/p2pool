@@ -1065,12 +1065,6 @@ class TariBlockChecker(threading.Thread):
                 WHERE block_height = %s
             """, (block_height,))
             
-            # 5. 删除区块记录
-            cur.execute("""
-                DELETE FROM blocks 
-                WHERE id = %s
-            """, (block_id,))
-            
             conn.commit()
             logger.info(f"区块 {block_height} 已标记为无效并清理相关数据")
             

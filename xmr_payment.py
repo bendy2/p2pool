@@ -38,7 +38,7 @@ def is_valid_monero_address(address):
         return False
         
     # 检查长度
-    if len(address) not in [95, 106]:
+    if len(address) != 95:
         return False
         
     # 检查前缀
