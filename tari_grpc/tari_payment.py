@@ -382,7 +382,7 @@ class TariPayment:
                 WHERE username = %s 
                 AND amount = %s 
                 AND status = 'pending' 
-                AND txid = "-"
+                AND txid = '-'
                 RETURNING id
             """, (txid, status, note, username, amount))
             
