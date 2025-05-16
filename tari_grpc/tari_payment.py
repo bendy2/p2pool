@@ -104,6 +104,15 @@ class TariPayment:
             self.cursor.execute("BEGIN")
             status = "completed" if s == 0 else "pending"
             
+            # 如果note是TransactionInfo对象，转换为JSON
+            if hasattr(note, 'tx_id'):  # 检查是否是TransactionInfo对象
+                note_dict = MessageToDict(
+                    note,
+                    including_default_value_fields=True,
+                    preserving_proto_field_name=True
+                )
+                note = json.dumps(note_dict, ensure_ascii=False)
+            
             # 插入支付记录
             self.cursor.execute("""
                 INSERT INTO payment (username, type, amount, txid, time, status, note)
@@ -292,6 +301,7 @@ class TariPayment:
             except Exception as e:
                 logger.error(f"运行出错: {str(e)}")
                 time.sleep(10)  # 出错后等待10秒再重试
+                exit()
 
     def __del__(self):
         """清理资源"""
