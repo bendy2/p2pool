@@ -342,7 +342,7 @@ class TariPayment:
             # 插入待处理的支付记录
             self.cursor.execute("""
                 INSERT INTO payment (username, type, amount, txid, time, status, note)
-                VALUES (%s, 'tari', %s, "-", %s, 'pending', '待发送')
+                VALUES (%s, 'tari', %s, '-', %s, 'pending', '待发送')
             """, (username, amount, datetime.now()))
             
             # 更新用户余额
