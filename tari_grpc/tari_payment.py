@@ -286,11 +286,6 @@ class TariPayment:
             payment_list = []
             total_payment_amount = Decimal('0')
             
-            print("\n待支付用户列表:")
-            print("-" * 100)
-            print(f"{'用户名':<20} {'总余额(TARI)':<15} {'可用余额(TARI)':<15} {'钱包地址':<50}")
-            print("-" * 100)
-            
             for username, total_balance, wallet in targets:
                 # 计算可用余额
                 available_balance = self.get_available_balance(username, total_balance)
@@ -299,35 +294,40 @@ class TariPayment:
                 if available_balance >= self.min_payout:
                     payment_list.append({
                         'username': username,
-                        'total_balance': total_balance,
                         'available_balance': available_balance,
                         'wallet': wallet
                     })
                     total_payment_amount += Decimal(str(available_balance))
-                    
-                    # 打印用户信息
-                    print(f"{username:<20} {total_balance:<15.2f} {available_balance:<15.2f} {wallet}")
             
-            print("-" * 100)
-            print(f"总计待支付用户数: {len(payment_list)}")
-            print(f"总计支付金额: {total_payment_amount:.2f} TARI")
-            
-            # 3. 确认是否继续支付
-            if not payment_list:
+            # 3. 显示待支付信息
+            if payment_list:
+                print("\n待支付列表:")
+                print("-" * 80)
+                print(f"{'序号':<6} {'用户名':<20} {'支付金额(TARI)':<15} {'钱包地址'}")
+                print("-" * 80)
+                
+                for i, payment in enumerate(payment_list, 1):
+                    print(f"{i:<6} {payment['username']:<20} {payment['available_balance']:<15.2f} {payment['wallet']}")
+                
+                print("-" * 80)
+                print(f"总计待支付: {len(payment_list)} 笔")
+                print(f"总计金额: {total_payment_amount:.2f} TARI")
+            else:
                 logger.info("没有满足支付条件的用户")
                 return
                 
+            # 4. 确认是否继续支付
             if not self.confirm_action("是否确认开始支付?"):
                 logger.info("操作员取消了支付操作")
                 return
             
-            # 4. 逐个处理支付
-            for payment in payment_list:
+            # 5. 逐个处理支付
+            for i, payment in enumerate(payment_list, 1):
                 username = payment['username']
                 amount = payment['available_balance']
                 address = payment['wallet']
                 
-                print(f"\n准备支付: {username} - {amount} TARI")
+                print(f"\n[{i}/{len(payment_list)}] 准备支付: {username} - {amount:.2f} TARI")
                 if not self.confirm_action("是否继续这笔支付?"):
                     logger.info(f"跳过用户 {username} 的支付")
                     continue
