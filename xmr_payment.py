@@ -263,9 +263,9 @@ class XMRPayment:
             
             # 插入支付记录
             cur.execute("""
-                INSERT INTO payment (username, type, amount, txid, time)
-                VALUES (%s, 'xmr', %s, %s, %s)
-            """, (username, amount, txid, datetime.now()))
+                INSERT INTO payment (username, type, amount, txid, time, status, note)
+                VALUES (%s, 'xmr', %s, %s, %s, 'completed', %s)
+            """, (username, amount, txid, datetime.now(), f"Fee: {fee:.12f} XMR"))
             
             # 更新用户余额（只减去实际支付的金额和手续费）
             cur.execute("""

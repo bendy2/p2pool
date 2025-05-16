@@ -98,35 +98,34 @@ class TariPayment:
             logger.error(f"获取支付目标失败: {str(e)}")
             return None
 
-    def record_payment(self, username, amount, txid, fee):
+    def record_payment(self, username, amount, txid, s, note):
         """记录支付信息并更新用户余额"""
-        conn = get_db_connection()
-        cur = conn.cursor()
         try:
-            cur.execute("BEGIN")
+            self.cursor.execute("BEGIN")
+            status = "completed" if s == 0 else "pending"
             
             # 插入支付记录
-            cur.execute("""
-                INSERT INTO payment (username, type, amount, txid, time)
-                VALUES (%s, 'xmr', %s, %s, %s)
-            """, (username, amount, txid, datetime.now()))
+            self.cursor.execute("""
+                INSERT INTO payment (username, type, amount, txid, time, status, note)
+                VALUES (%s, 'tari', %s, %s, %s, %s, %s)
+            """, (username, amount, txid, datetime.now(), status, note))
             
             # 更新用户余额（只减去实际支付的金额和手续费）
-            cur.execute("""
+            self.cursor.execute("""
                 UPDATE account 
-                SET xmr_balance = xmr_balance - %s 
+                SET tari_balance = tari_balance - %s 
                 WHERE username = %s
-            """, (amount + fee, username))
+            """, (amount, username))
             
-            conn.commit()
+            self.conn.commit()
             
         except Exception as e:
-            conn.rollback()
+            self.conn.rollback()
             logger.error(f"记录支付信息时出错: {str(e)}")
             raise
         finally:
-            cur.close()
-            conn.close()
+            self.cursor.close()
+            self.conn.close()
 
     def send_transaction(self, address, amount):
         """发送交易"""
@@ -271,18 +270,18 @@ class TariPayment:
                             user_id,
                             available_balance, 
                             txid, 
-                            0
+                            0,
+                            tx_info
                         )
                     else:
                         logger.error("交易未确认")
                         # 记录支付结果
                         self.record_payment(
                             user_id,
-                            address, 
                             available_balance, 
                             txid, 
-                            0,  # 失败状态
-                            0
+                            1,
+                            tx_info
                         )
                 
                 # 等待10秒后进行下一次支付
