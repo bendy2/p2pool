@@ -175,9 +175,13 @@ class TariReward:
             self.cursor.execute("BEGIN")
             
             for username, original_reward in user_rewards:
+                # 确保original_reward是Decimal类型
+                original_reward = Decimal(str(original_reward))
+                
                 # 计算额外奖励
-                bonus_reward = Decimal(str(original_reward)) * self.reward_percentage
-                bonus_reward = Decimal(str(int(bonus_reward * 1e6) / 1e6))  # 保留6位小数
+                bonus_reward = original_reward * self.reward_percentage
+                # 保留6位小数
+                bonus_reward = Decimal(str(int(bonus_reward * Decimal('1000000')) / Decimal('1000000')))
                 
                 # 插入奖励记录
                 self.cursor.execute("""
@@ -199,7 +203,7 @@ class TariReward:
                 # 显示信息
                 print(f"{username:<20} {original_reward:<15.6f} {bonus_reward:<15.6f}")
                 
-                total_original += Decimal(str(original_reward))
+                total_original += original_reward
                 total_bonus += bonus_reward
             
             # 提交事务
