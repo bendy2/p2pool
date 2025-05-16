@@ -222,40 +222,89 @@ class TariPayment:
             logger.error(f"计算用户 {user_id} 可用余额失败: {str(e)}")
             return Decimal('0')
 
+    def get_all_payment_targets(self):
+        """获取所有有效的支付目标"""
+        try:
+            self.cursor.execute('''
+                SELECT username, tari_balance, tari_wallet 
+                FROM account 
+                WHERE tari_wallet IS NOT NULL
+                AND tari_balance > 0
+                ORDER BY tari_balance DESC
+            ''')
+            return self.cursor.fetchall()
+        except Exception as e:
+            logger.error(f"获取支付目标失败: {str(e)}")
+            return []
+
+    def confirm_action(self, message):
+        """确认操作"""
+        response = input(f"\n{message} (y/n): ").lower().strip()
+        return response == 'y'
+
     def run(self):
         """运行自动支付程序"""
-        logger.info("启动自动支付程序...")
+        logger.info("启动Tari支付程序...")
         
-        while True:
-            try:
-                # 获取下一个支付目标
-                user_id = "bendy"
-                address = "12GiRMnB7vcFMvmoW1wdm7wyfvRnAuBRnjP4GaLuWrhb5NKuyxda3xQckhVJ4S4mPBvhoSfixTDk3BFMvVjmr166539"
-                available_balance = 0.1
-                """
+        try:
+            # 1. 获取所有有效的支付目标
+            targets = self.get_all_payment_targets()
+            if not targets:
+                logger.info("没有找到任何待支付的用户")
+                return
 
-                target = self.get_next_payment_target()
-                if not target:
-                    logger.info("没有待支付的目标，等待10秒后重试...")
-                    time.sleep(10)
-                    exit()
+            # 2. 计算每个用户的可用余额并筛选满足条件的用户
+            payment_list = []
+            total_payment_amount = Decimal('0')
+            
+            print("\n待支付用户列表:")
+            print("-" * 100)
+            print(f"{'用户名':<20} {'总余额(TARI)':<15} {'可用余额(TARI)':<15} {'钱包地址':<50}")
+            print("-" * 100)
+            
+            for username, total_balance, wallet in targets:
+                # 计算可用余额
+                available_balance = self.get_available_balance(username, total_balance)
+                
+                # 检查是否满足最小支付额度
+                if available_balance >= self.min_payout:
+                    payment_list.append({
+                        'username': username,
+                        'total_balance': total_balance,
+                        'available_balance': available_balance,
+                        'wallet': wallet
+                    })
+                    total_payment_amount += Decimal(str(available_balance))
+                    
+                    # 打印用户信息
+                    print(f"{username:<20} {total_balance:<15.2f} {available_balance:<15.2f} {wallet}")
+            
+            print("-" * 100)
+            print(f"总计待支付用户数: {len(payment_list)}")
+            print(f"总计支付金额: {total_payment_amount:.2f} TARI")
+            
+            # 3. 确认是否继续支付
+            if not payment_list:
+                logger.info("没有满足支付条件的用户")
+                return
+                
+            if not self.confirm_action("是否确认开始支付?"):
+                logger.info("操作员取消了支付操作")
+                return
+            
+            # 4. 逐个处理支付
+            for payment in payment_list:
+                username = payment['username']
+                amount = payment['available_balance']
+                address = payment['wallet']
+                
+                print(f"\n准备支付: {username} - {amount} TARI")
+                if not self.confirm_action("是否继续这笔支付?"):
+                    logger.info(f"跳过用户 {username} 的支付")
                     continue
                 
-                user_id, amount, address = target
-                
-                # 获取用户可用余额
-                available_balance = self.get_available_balance(user_id, amount)
-                if available_balance <= 0:
-                    logger.info(f"用户 {user_id} 可用余额不足，等待10秒后重试...")
-                    time.sleep(10)
-                    exit()
-                    continue
-                
-                logger.info(f"开始处理用户 {user_id} 的支付目标: ID={user_id}, 地址={address}, 金额={available_balance}")
-
-                """
                 # 发送交易
-                txid = self.send_transaction(address, available_balance)
+                txid = self.send_transaction(address, amount)
                 
                 if txid:
                     # 等待交易确认
@@ -264,40 +313,21 @@ class TariPayment:
                     
                     # 检查交易状态
                     tx_info = self.check_transaction(txid)
-                    print(tx_info);
-                    if tx_info and (
-                        tx_info.status == 1 or 
-                        tx_info.status == "TRANSACTION_STATUS_BROADCAST"
-                    ):  # 状态为1表示确认成功
-                        logger.info(f"交易已确认，区块高度: {tx_info}")
-                        # 记录支付结果
-                        self.record_payment(
-                            user_id,
-                            available_balance, 
-                            txid, 
-                            0,
-                            tx_info
-                        )
+                    if tx_info and (tx_info.status == 1 or tx_info.status == "TRANSACTION_STATUS_BROADCAST"):
+                        logger.info(f"交易已确认: {txid}")
+                        self.record_payment(username, amount, txid, 0, tx_info)
                     else:
                         logger.error("交易未确认")
-                        # 记录支付结果
-                        self.record_payment(
-                            user_id,
-                            available_balance, 
-                            txid, 
-                            1,
-                            tx_info
-                        )
+                        self.record_payment(username, amount, txid, 1, tx_info)
                 
-                # 等待10秒后进行下一次支付
-                logger.info("等待10秒后进行下一次支付...")
-                exit()
-                time.sleep(10)
+                # 每笔交易后等待
+                time.sleep(5)
                 
-            except Exception as e:
-                logger.error(f"运行出错: {str(e)}")
-                time.sleep(10)  # 出错后等待10秒再重试
-                exit()
+            logger.info("所有支付处理完成")
+            
+        except Exception as e:
+            logger.error(f"运行出错: {str(e)}")
+            raise
 
     def __del__(self):
         """清理资源"""
