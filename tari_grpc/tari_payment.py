@@ -42,6 +42,22 @@ def convert_buffer_to_readable(buffer_data):
         logger.error(f"转换 buffer 数据时出错: {str(e)}")
         return None
 
+def is_valid_tari_address(address):
+    """验证Tari钱包地址
+    - 长度必须为92字符
+    - 必须以'12'开头
+    """
+    if not isinstance(address, str):
+        return False
+    
+    if len(address) != 92:
+        return False
+        
+    if not address.startswith('12'):
+        return False
+        
+    return True
+
 class TariPayment:
     def __init__(self):
         self.config = self.load_config()        
@@ -232,7 +248,19 @@ class TariPayment:
                 AND tari_balance > 0
                 ORDER BY tari_balance DESC
             ''')
-            return self.cursor.fetchall()
+            targets = self.cursor.fetchall()
+            
+            # 过滤出有效的钱包地址
+            valid_targets = []
+            for target in targets:
+                username, balance, wallet = target
+                if not is_valid_tari_address(wallet):
+                    logger.warning(f"用户 {username} 的钱包地址无效: {wallet}")
+                    continue
+                valid_targets.append(target)
+                
+            return valid_targets
+            
         except Exception as e:
             logger.error(f"获取支付目标失败: {str(e)}")
             return []
