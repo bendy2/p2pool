@@ -184,13 +184,14 @@ class TariReward:
                 bonus_reward = Decimal(str(int(bonus_reward * Decimal('1000000')) / Decimal('1000000')))
                 
                 # 插入奖励记录
+                current_time = datetime.now()
                 self.cursor.execute("""
                     INSERT INTO rewards (
-                        block_height, type, username, reward, shares, time,  height
+                        block_height, type, username, reward, shares, time, height
                     ) VALUES (
-                        0, 'tari', %s, %s, 0, %s, 0 
-                    )   
-                """, (username, bonus_reward, datetime.now(), datetime.now()))
+                        0, 'tari', %s, %s, 0, %s, 0
+                    )
+                """, (username, bonus_reward, current_time))
                 
                 # 更新用户余额
                 self.cursor.execute("""
