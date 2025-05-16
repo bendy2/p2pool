@@ -48,12 +48,15 @@ def is_valid_tari_address(address):
     - 必须以'12'开头
     """
     if not isinstance(address, str):
+        logger.info('111')
         return False
     
     if len(address) != 92:
+        logger.info('222')
         return False
         
     if not address.startswith('12'):
+        logger.info('333')
         return False
         
     return True
