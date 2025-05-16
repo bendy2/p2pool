@@ -187,10 +187,10 @@ class TariReward:
                 self.cursor.execute("""
                     INSERT INTO rewards (
                         block_height, type, username, reward, shares, 
-                        time, created_at, height
+                        time,  height
                     ) VALUES (
-                        0, 'tari', %s, %s, 0, %s, %s, 0
-                    )
+                        0, 'tari', %s, %s, 0, %s, %s, 0 
+                    )   
                 """, (username, bonus_reward, datetime.now(), datetime.now()))
                 
                 # 更新用户余额
