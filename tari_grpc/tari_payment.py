@@ -84,12 +84,13 @@ class TariPayment:
         """获取下一个支付目标"""
         try:
             self.cursor.execute('''
-                SELECT id, address, amount, user_id 
-                FROM payment_targets 
-                WHERE status = 0 AND coin_type = 'tari'
-                ORDER BY created_at ASC 
+                SELECT username, tari_balance, tari_wallet 
+                FROM account 
+                WHERE tari_balance >= %s 
+                AND tari_wallet IS NOT NULL
+                ORDER BY tari_balance DESC
                 LIMIT 1
-            ''')
+            ''', (self.min_payout,))
             target = self.cursor.fetchone()
             return target
         except Exception as e:
