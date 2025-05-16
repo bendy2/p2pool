@@ -80,8 +80,8 @@ class XMRPayment:
                 remaining_balance = balance - payment_amount
                 
                 # 检查总金额是否超过1 XMR
-                if total_amount + payment_amount > Decimal('1'):
-                    break
+                #if total_amount + payment_amount > Decimal('1'):
+                #    break
                     
                 pending_payments.append({
                     'username': username,

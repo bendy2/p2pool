@@ -97,7 +97,7 @@ class TariPayment:
                 FROM payment_targets 
                 WHERE status = 0 AND coin_type = 'tari'
                 ORDER BY created_at ASC 
-                LIMIT 1
+                LIMIT 10
             ''')
             target = self.cursor.fetchone()
             return target
