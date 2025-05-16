@@ -2,8 +2,8 @@
 import json
 import logging
 import psycopg2
-import subprocess
 import os
+import csv
 from datetime import datetime, timedelta
 from decimal import Decimal
 
@@ -35,7 +35,7 @@ class TariReward:
             raise
 
     def backup_database(self):
-        """备份数据库"""
+        """使用Python备份数据库"""
         try:
             # 创建备份目录
             backup_dir = "database_backups"
@@ -44,42 +44,65 @@ class TariReward:
 
             # 生成备份文件名（使用时间戳）
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            backup_file = os.path.join(backup_dir, f"payment_backup_{timestamp}.sql")
+            backup_file = os.path.join(backup_dir, f"payment_backup_{timestamp}.csv")
 
-            # 构建pg_dump命令
-            db_config = self.config.get('database', {})
-            pg_dump_cmd = [
-                "pg_dump",
-                "-h", db_config.get('host', 'localhost'),
-                "-p", str(db_config.get('port', 5432)),
-                "-U", db_config.get('user', 'postgres'),
-                "-F", "c",  # 使用自定义格式
-                "-b",  # 包含大对象
-                "-v",  # 详细模式
-                "-f", backup_file,
-                db_config.get('database', 'payment')
-            ]
+            # 需要备份的表
+            tables = ['account', 'rewards', 'payment']
 
-            # 设置环境变量
-            env = os.environ.copy()
-            env["PGPASSWORD"] = db_config.get('password', '')
-
-            # 执行备份命令
-            logger.info("开始备份数据库...")
-            process = subprocess.Popen(
-                pg_dump_cmd,
-                env=env,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE
+            # 创建备份连接
+            backup_conn = psycopg2.connect(
+                host=self.config['database']['host'],
+                port=self.config['database']['port'],
+                database=self.config['database']['database'],
+                user=self.config['database']['user'],
+                password=self.config['database']['password']
             )
-            stdout, stderr = process.communicate()
+            backup_cursor = backup_conn.cursor()
 
-            if process.returncode == 0:
-                logger.info(f"数据库备份成功: {backup_file}")
-                return True
-            else:
-                logger.error(f"数据库备份失败: {stderr.decode()}")
-                return False
+            # 开始备份
+            logger.info("开始备份数据库...")
+            
+            with open(backup_file, 'w', newline='') as csvfile:
+                writer = csv.writer(csvfile)
+                
+                # 写入备份信息
+                writer.writerow(['BACKUP_INFO'])
+                writer.writerow(['timestamp', timestamp])
+                writer.writerow(['database', self.config['database']['database']])
+                writer.writerow([])  # 空行分隔
+
+                # 备份每个表
+                for table in tables:
+                    # 获取表结构
+                    backup_cursor.execute(f"""
+                        SELECT column_name, data_type 
+                        FROM information_schema.columns 
+                        WHERE table_name = %s
+                        ORDER BY ordinal_position
+                    """, (table,))
+                    columns = backup_cursor.fetchall()
+                    
+                    # 写入表信息
+                    writer.writerow(['TABLE_INFO'])
+                    writer.writerow(['table_name', table])
+                    writer.writerow(['columns'] + [col[0] for col in columns])
+                    writer.writerow([])  # 空行分隔
+
+                    # 获取表数据
+                    backup_cursor.execute(f"SELECT * FROM {table}")
+                    rows = backup_cursor.fetchall()
+                    
+                    # 写入数据
+                    writer.writerow(['TABLE_DATA'])
+                    for row in rows:
+                        writer.writerow(row)
+                    writer.writerow([])  # 空行分隔
+
+            backup_cursor.close()
+            backup_conn.close()
+
+            logger.info(f"数据库备份成功: {backup_file}")
+            return True
 
         except Exception as e:
             logger.error(f"数据库备份过程出错: {str(e)}")
