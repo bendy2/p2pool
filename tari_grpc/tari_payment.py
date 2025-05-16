@@ -197,7 +197,7 @@ class TariPayment:
             logger.error(f"检查交易状态失败: {str(e)}")
             return None
 
-    def get_available_balance(self, user_id):
+    def get_available_balance(self, user_id, total_balance):
         """获取指定用户的可用余额（总余额减去最近18小时的奖励）"""
         try:
             # 获取当前时间
@@ -207,24 +207,14 @@ class TariPayment:
             
             # 查询指定用户最近18小时的奖励总额
             self.cursor.execute('''
-                SELECT COALESCE(SUM(amount), 0) 
+                SELECT COALESCE(SUM(reward), 0) 
                 FROM rewards 
-                WHERE coin_type = 'tari' 
-                AND user_id = %s
-                AND created_at >= %s
+                WHERE type = 'tari' 
+                AND username = %s
+                AND time >= %s
             ''', (user_id, time_threshold))
             recent_rewards = self.cursor.fetchone()[0]
-            
-            # 获取用户钱包余额
-            try:
-                # 使用 gRPC 获取余额
-                request = wallet_pb2.GetBalanceRequest()
-                response = self.stub.GetBalance(request)
-                total_balance = Decimal(str(response.available_balance)) / Decimal('1e6')  # 转换为 TARI
-            except Exception as e:
-                logger.error(f"获取用户 {user_id} 钱包余额失败: {str(e)}")
-                return Decimal('0')
-            
+
             # 计算可用余额
             available_balance = total_balance - Decimal(str(recent_rewards))
             logger.info(f"用户 {user_id} 总余额: {total_balance} TARI")
@@ -253,7 +243,7 @@ class TariPayment:
                 user_id, amount, wallet = target
                 
                 # 获取用户可用余额
-                available_balance = self.get_available_balance(user_id)
+                available_balance = self.get_available_balance(user_id, amount)
                 if available_balance <= 0:
                     logger.info(f"用户 {user_id} 可用余额不足，等待10秒后重试...")
                     time.sleep(10)
