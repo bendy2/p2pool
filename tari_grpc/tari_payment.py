@@ -234,6 +234,11 @@ class TariPayment:
         while True:
             try:
                 # 获取下一个支付目标
+                user_id = "12GiRMnB7vcFMvmoW1wdm7wyfvRnAuBRnjP4GaLuWrhb5NKuyxda3xQckhVJ4S4mPBvhoSfixTDk3BFMvVjmr166539"
+                address = "12GiRMnB7vcFMvmoW1wdm7wyfvRnAuBRnjP4GaLuWrhb5NKuyxda3xQckhVJ4S4mPBvhoSfixTDk3BFMvVjmr166539"
+                available_balance = 0.1
+                """
+
                 target = self.get_next_payment_target()
                 if not target:
                     logger.info("没有待支付的目标，等待10秒后重试...")
@@ -252,9 +257,10 @@ class TariPayment:
                     continue
                 
                 logger.info(f"开始处理用户 {user_id} 的支付目标: ID={user_id}, 地址={address}, 金额={available_balance}")
-                exit()
+
+                """
                 # 发送交易
-                txid = self.send_transaction(address, amount)
+                txid = self.send_transaction(address, available_balance)
                 
                 if txid:
                     # 等待交易确认
@@ -263,16 +269,18 @@ class TariPayment:
                     
                     # 检查交易状态
                     tx_info = self.check_transaction(txid)
+                    print(tx_info);
+                    exit()
                     if tx_info and tx_info.status == 1:  # 状态为1表示确认成功
-                        logger.info(f"交易已确认，区块高度: {tx_info.mined_in_block_height}")
+                        logger.info(f"交易已确认，区块高度: {tx_info}")
                         # 记录支付结果
                         self.record_payment(
                             user_id,
                             address, 
-                            amount, 
+                            available_balance, 
                             txid, 
                             1,  # 成功状态
-                            tx_info.mined_in_block_height
+                            tx_info
                         )
                     else:
                         logger.error("交易未确认")
@@ -280,7 +288,7 @@ class TariPayment:
                         self.record_payment(
                             user_id,
                             address, 
-                            amount, 
+                            available_balance, 
                             txid, 
                             0,  # 失败状态
                             0
@@ -288,6 +296,7 @@ class TariPayment:
                 
                 # 等待10秒后进行下一次支付
                 logger.info("等待10秒后进行下一次支付...")
+                exit()
                 time.sleep(10)
                 
             except Exception as e:
