@@ -56,7 +56,7 @@ class TariPayment:
     def load_config(self):
         """加载配置文件"""
         try:
-            with open('config.json', 'r') as f:
+            with open('../config.json', 'r') as f:
                 return json.load(f)
         except Exception as e:
             logger.error(f"加载配置文件失败: {str(e)}")
