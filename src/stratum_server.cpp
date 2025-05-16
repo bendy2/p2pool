@@ -837,7 +837,7 @@ void StratumServer::on_blobs_ready()
 			// Not logged in yet, on_login() will send the job to this client. Also close inactive connections.
 			if (cur_time >= client->m_connectedTime + 10) {
 				LOGWARN(4, "client " << static_cast<char*>(client->m_addrString) << " didn't send login data");
-				client->ban(DEFAULT_BAN_TIME);
+				//client->ban(DEFAULT_BAN_TIME);
 				client->close();
 			}
 			continue;
@@ -1132,7 +1132,7 @@ void StratumServer::on_after_share_found(uv_work_t* req, int /*status*/)
 		client->m_score += share->m_score;
 
 		if (bad_share && (client->m_score <= BAN_THRESHOLD_POINTS)) {
-			client->ban(DEFAULT_BAN_TIME);
+			//client->ban(DEFAULT_BAN_TIME);
 			client->close();
 		}
 		else if (!result) {
@@ -1140,7 +1140,7 @@ void StratumServer::on_after_share_found(uv_work_t* req, int /*status*/)
 		}
 	}
 	else if (bad_share) {
-		server->ban(share->m_clientIPv6, share->m_clientAddr, DEFAULT_BAN_TIME);
+		//server->ban(share->m_clientIPv6, share->m_clientAddr, DEFAULT_BAN_TIME);
 	}
 
 	if (share->m_allocated) {
@@ -1250,7 +1250,7 @@ bool StratumServer::StratumClient::on_read(const char* data, uint32_t size)
 	auto on_parse = [this](const char* data, uint32_t size) {
 		if (static_cast<size_t>(m_stratumReadBufBytes) + size > STRATUM_BUF_SIZE) {
 			LOGWARN(4, "client " << static_cast<const char*>(m_addrString) << " sent too long Stratum message");
-			ban(DEFAULT_BAN_TIME);
+			//ban(DEFAULT_BAN_TIME);
 			return false;
 		}
 
@@ -1278,7 +1278,7 @@ bool StratumServer::StratumClient::on_read(const char* data, uint32_t size)
 
 				*c = '\0';
 				if (!process_request(line_start, static_cast<uint32_t>(c - line_start))) {
-					ban(DEFAULT_BAN_TIME);
+					//ban(DEFAULT_BAN_TIME);
 					return false;
 				}
 
