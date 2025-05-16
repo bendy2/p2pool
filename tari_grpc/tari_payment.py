@@ -222,7 +222,7 @@ class TariPayment:
             logger.info(f"用户 {user_id} 最近18小时奖励: {recent_rewards} TARI")
             logger.info(f"用户 {user_id} 可用余额: {available_balance} TARI")
             
-            return floor(available_balance)
+            return math.floor(available_balance)
         except Exception as e:
             logger.error(f"计算用户 {user_id} 可用余额失败: {str(e)}")
             return Decimal('0')
