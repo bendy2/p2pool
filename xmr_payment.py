@@ -311,7 +311,6 @@ class XMRPayment:
                 # 支付间隔
                 print("等待60秒")
                 time.sleep(60)
-                input("\n按回车键继续下一批支付...")
 
                 
         except Exception as e:
