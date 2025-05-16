@@ -240,7 +240,7 @@ class TariPayment:
                     exit()
                     continue
                 
-                user_id, amount, wallet = target
+                user_id, amount, address = target
                 
                 # 获取用户可用余额
                 available_balance = self.get_available_balance(user_id, amount)
@@ -250,8 +250,7 @@ class TariPayment:
                     exit()
                     continue
                 
-                logger.info(f"开始处理用户 {user_id} 的支付目标: ID={user_id}, 地址={wallet}, 金额={amount}")
-                exit
+                logger.info(f"开始处理用户 {user_id} 的支付目标: ID={user_id}, 地址={address}, 金额={amount}")
                 
                 # 发送交易
                 txid = self.send_transaction(address, amount)
