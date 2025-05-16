@@ -300,11 +300,10 @@ class XMRPayment:
                     break
                 
                 # 支付间隔
-                if self.interactive:
-                    input("\n按回车键继续下一批支付...")
-                else:
-                    time.sleep(1)
-                    exit()
+                print("等待60秒")
+                time.sleep(60)
+                input("\n按回车键继续下一批支付...")
+
                 
         except Exception as e:
             logger.error(f"支付处理过程中出错: {str(e)}")
