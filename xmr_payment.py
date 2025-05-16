@@ -78,6 +78,8 @@ class XMRPayment:
                 # 将支付金额精确到小数点后3位
                 payment_amount = Decimal(str(int(balance * 1000) / 1000))
                 remaining_balance = balance - payment_amount
+                if len(wallet) < 47:
+                    continue
                 
                 # 检查总金额是否超过1 XMR
                 #if total_amount + payment_amount > Decimal('1'):
