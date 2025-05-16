@@ -155,21 +155,16 @@ class TariPayment:
             )
             
             # 发送请求
-            response = self.stub.Transfer(transfer_request)
+            response_data = self.stub.Transfer(transfer_request)
             
-            # 将响应对象转换为字典
-            response_dict = MessageToDict(
-                response,
-                including_default_value_fields=True,
-                preserving_proto_field_name=True
-            )
-            logger.info(f"响应内容: {json.dumps(response_dict, indent=2, ensure_ascii=False)}")
+            logger.info(f"响应内容: {response_data}")
+            results = response_data.results[0]
             
-            if response.is_success:
+            if results.is_success:
                 logger.info(f"交易发送成功:")
-                logger.info(f"交易ID: {response.transaction_id}")
-                logger.info(f"目标地址: {response.address}")
-                return response.transaction_id
+                logger.info(f"交易ID: {results.transaction_id}")
+                logger.info(f"目标地址: {results.address}")
+                return results.transaction_id
             else:
                 logger.error("交易发送失败")
                 return None
