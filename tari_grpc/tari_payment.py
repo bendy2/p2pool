@@ -251,7 +251,7 @@ class TariPayment:
                     continue
                 
                 logger.info(f"开始处理用户 {user_id} 的支付目标: ID={user_id}, 地址={address}, 金额={amount}")
-                
+                exit()
                 # 发送交易
                 txid = self.send_transaction(address, amount)
                 
