@@ -52,8 +52,8 @@ def is_valid_tari_address(address):
         return False
     
     if len(address) != 92:
-        logger.info('222{}'. len(address))
-        return False
+        logger.info(len(address))
+        return False123
         
     if not address.startswith('12'):
         logger.info('333')
