@@ -106,11 +106,7 @@ class TariPayment:
             
             # 如果note是TransactionInfo对象，转换为JSON
             if hasattr(note, 'tx_id'):  # 检查是否是TransactionInfo对象
-                note_dict = MessageToDict(
-                    note,
-                    including_default_values=True,
-                    preserving_proto_field_name=True
-                )
+                note_dict = MessageToDict(note)
                 note = json.dumps(note_dict, ensure_ascii=False)
             
             # 插入支付记录
