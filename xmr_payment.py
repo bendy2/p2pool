@@ -28,6 +28,30 @@ def load_config():
         logger.error(f"加载配置文件失败: {str(e)}")
         raise
 
+def is_valid_monero_address(address):
+    """验证门罗币地址
+    - 主网地址以4开头，长度95字符
+    - 集成地址以4开头，长度106字符
+    - 子地址以8开头，长度95字符
+    """
+    if not isinstance(address, str):
+        return False
+        
+    # 检查长度
+    if len(address) not in [95, 106]:
+        return False
+        
+    # 检查前缀
+    if not (address.startswith('4') or address.startswith('8')):
+        return False
+        
+    # 检查是否只包含Base58字符
+    allowed_chars = set("123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz")
+    if not set(address).issubset(allowed_chars):
+        return False
+        
+    return True
+
 # 数据库连接
 def get_db_connection():
     config = load_config()
@@ -78,7 +102,9 @@ class XMRPayment:
                 # 将支付金额精确到小数点后3位
                 payment_amount = Decimal(str(int(balance * 1000) / 1000))
                 remaining_balance = balance - payment_amount
-                if len(wallet) < 47:
+                # 验证钱包地址
+                if not is_valid_monero_address(wallet):
+                    logger.warning(f"用户 {username} 的钱包地址无效: {wallet}")
                     continue
                 
                 # 检查总金额是否超过1 XMR
@@ -99,17 +125,10 @@ class XMRPayment:
             if self.interactive:
                 print("\n待支付用户列表:")
                 for payment in pending_payments:
-                    print(f"用户: {payment['username']}")
-                    print(f"总余额: {payment['total_balance']:.12f} XMR")
-                    print(f"本次支付: {payment['payment_amount']:.3f} XMR")
-                    print(f"剩余余额: {payment['remaining_balance']:.12f} XMR")
-                    print(f"钱包地址: {payment['wallet']}")
+                    print(f"用户: {payment['username']} 总余额: {payment['total_balance']:.12f} XMR 本次支付: {payment['payment_amount']:.3f} XMR 剩余余额: {payment['remaining_balance']:.12f} XMR 钱包地址: {payment['wallet']}")
                     print("-" * 50)
                 print(f"\n总支付金额: {total_amount:.3f} XMR")
                 
-                if not confirm_action("是否继续处理这些支付？", self.interactive):
-                    logger.info("用户取消了支付处理")
-                    return []
             
             return pending_payments
             
@@ -153,18 +172,13 @@ class XMRPayment:
                 balance = Decimal(str(result["result"]["balance"])) / Decimal('1e12')
                 unlocked_balance = Decimal(str(result["result"]["unlocked_balance"])) / Decimal('1e12')
                 
-                if self.interactive:
-                    print(f"\n钱包余额信息:")
-                    print(f"总余额: {balance:.12f} XMR")
-                    print(f"可用余额: {unlocked_balance:.12f} XMR")
-                    print(f"需支付金额: {total_amount:.12f} XMR")
+                print(f"\n钱包余额信息:")
+                print(f"总余额: {balance:.12f} XMR 可用余额: {unlocked_balance:.12f} XMR 需支付金额: {total_amount:.12f} XMR")
                 
                 if unlocked_balance < total_amount:
                     logger.error(f"钱包可用余额不足: {unlocked_balance:.12f} XMR, 需要: {total_amount:.12f} XMR")
                     return False
                 
-                if self.interactive and not confirm_action("钱包余额确认，是否继续？", self.interactive):
-                    return False
                     
                 return True
         except Exception as e:
@@ -192,14 +206,13 @@ class XMRPayment:
                     "address": address
                 })
             
-            if self.interactive:
-                print(f"\n准备合并支付:")
-                print(f"总金额: {total_amount:.3f} XMR")
-                print(f"支付用户数: {len(destinations)}")
-                
-                if not confirm_action("确认进行合并支付？", self.interactive):
-                    logger.info("用户取消了合并支付")
-                    return False
+            print(f"\n准备合并支付:")
+            print(f"总金额: {total_amount:.3f} XMR")
+            print(f"支付用户数: {len(destinations)}")
+            
+            if not confirm_action("确认进行合并支付？", self.interactive):
+                logger.info("用户取消了合并支付")
+                return False
             
             # 执行合并支付
             params = {
@@ -219,10 +232,6 @@ class XMRPayment:
                     print(f"交易哈希: {tx_hash}")
                     print(f"手续费: {fee:.12f} XMR")
                     
-                    if not confirm_action("确认记录此笔支付？", self.interactive):
-                        logger.warning("用户取消了对合并支付的记录")
-                        return False
-                
                 # 记录所有用户的支付
                 for payment in payment_info:
                     self.record_payment(
