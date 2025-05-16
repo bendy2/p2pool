@@ -43,22 +43,13 @@ def convert_buffer_to_readable(buffer_data):
 
 class TariPayment:
     def __init__(self):
-        self.config = self.load_config()
-        self.wallet_grpc_url = self.config.get('tari_wallet_grpc', '127.0.0.1:18142')
-        
+        self.config = self.load_config()        
+        self.min_payout = Decimal(str(self.config.get('tari_min_payout', 100)))
         # 创建 gRPC 通道
-        self.channel = grpc.secure_channel(
-            self.wallet_grpc_url,
-            grpc.ssl_channel_credentials()
-        )
+        self.channel = grpc.insecure_channel('127.0.0.1:18143')
         
         # 创建 gRPC 存根
         self.stub = wallet_pb2_grpc.WalletStub(self.channel)
-        
-        # 加载支付配置
-        self.payment_config = self.config.get('payment', {})
-        self.payment_amount = self.payment_config.get('amount', 0.1)  # 默认0.1 TARI
-        
         # 初始化数据库连接
         self.init_database()
 
@@ -97,7 +88,7 @@ class TariPayment:
                 FROM payment_targets 
                 WHERE status = 0 AND coin_type = 'tari'
                 ORDER BY created_at ASC 
-                LIMIT 10
+                LIMIT 1
             ''')
             target = self.cursor.fetchone()
             return target
@@ -255,6 +246,7 @@ class TariPayment:
                 if not target:
                     logger.info("没有待支付的目标，等待10秒后重试...")
                     time.sleep(10)
+                    exit()
                     continue
                 
                 target_id, address, amount, user_id = target
