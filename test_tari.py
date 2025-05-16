@@ -55,14 +55,14 @@ def test_transfer(address: str, amount: float, message: str = "Test transfer"):
         print(f"交易ID: {response}")
         print("\n等待交易确认...")
 
-        txid = response.results.transaction_id
+        txid = response["result"].get("transaction_id")
         tx_query = { "transaction_ids": [txid] }
         
         max_attempts = 30
         for i in range(max_attempts):
             tx_status = stub.GetTransactionInfo(tx_query)
-            print(f"交易状态: {tx_status.status}")
-            if tx_status.status == "COMPLETED":
+            print(f"交易状态: {tx_status}")
+            if tx_status.transactions[0].status == "TRANSACTION_STATUS_MINED_CONFIRMED":
                 print("交易已确认!")
                 break
             if i == max_attempts - 1:

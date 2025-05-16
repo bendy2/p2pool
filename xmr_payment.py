@@ -50,7 +50,7 @@ def confirm_action(message, interactive):
 class XMRPayment:
     def __init__(self, interactive=True):
         self.config = load_config()
-        self.min_payout = Decimal(str(self.config.get('min_payout', 0.01)))
+        self.min_payout = Decimal(str(self.config.get('xmr_min_payout', 0.01)))
         self.wallet_rpc_url = self.config.get('monero_wallet_rpc', 'http://127.0.0.1:18082/json_rpc')
         self.wallet_rpc_user = self.config.get('monero_wallet_rpc_user', '')
         self.wallet_rpc_password = self.config.get('monero_wallet_rpc_password', '')

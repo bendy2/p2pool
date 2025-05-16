@@ -1,5 +1,7 @@
 {
     "pool_fees":  0.08,
+    "xmr_min_payout": 0.01,
+    "tari_min_payout": 100,
     "rewards": {
         "tari_block_reward": 13850
     },
