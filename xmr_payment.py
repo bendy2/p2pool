@@ -128,6 +128,9 @@ class XMRPayment:
                     print(f"用户: {payment['username']} 总余额: {payment['total_balance']:.12f} XMR 本次支付: {payment['payment_amount']:.3f} XMR 剩余余额: {payment['remaining_balance']:.12f} XMR 钱包地址: {payment['wallet']}")
                     print("-" * 50)
                 print(f"\n总支付金额: {total_amount:.3f} XMR")
+                if len(pending_payments) == 0:
+                    logger.info("没有待支付的用户")
+                    exit()
                 
             
             return pending_payments
