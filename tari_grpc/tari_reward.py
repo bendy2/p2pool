@@ -133,14 +133,37 @@ class TariReward:
             start_time = self.reward_date.replace(hour=0, minute=0, second=0, microsecond=0)
             end_time = start_time + timedelta(days=1)
             
+            # 修改查询逻辑，处理用户名和钱包地址
             self.cursor.execute("""
-                SELECT username, SUM(reward) as total_reward
-                FROM rewards
-                WHERE type = 'tari'
-                AND time >= %s
-                AND time < %s
-                GROUP BY username
-                HAVING SUM(reward) > 0
+                WITH parsed_rewards AS (
+                    SELECT 
+                        CASE 
+                            WHEN LENGTH(username) > 50 AND username LIKE '%:%' THEN 
+                                CASE 
+                                    WHEN SPLIT_PART(username, ':', 2) = '' THEN username
+                                    ELSE SPLIT_PART(username, ':', 2)
+                                END
+                            ELSE username 
+                        END as parsed_username,
+                        SUM(reward) as total_reward
+                    FROM rewards
+                    WHERE type = 'tari'
+                    AND time >= %s
+                    AND time < %s
+                    GROUP BY 
+                        CASE 
+                            WHEN LENGTH(username) > 50 AND username LIKE '%:%' THEN 
+                                CASE 
+                                    WHEN SPLIT_PART(username, ':', 2) = '' THEN username
+                                    ELSE SPLIT_PART(username, ':', 2)
+                                END
+                            ELSE username 
+                        END
+                    HAVING SUM(reward) > 0
+                )
+                SELECT parsed_username, total_reward
+                FROM parsed_rewards
+                ORDER BY total_reward DESC
             """, (start_time, end_time))
             
             return self.cursor.fetchall()

@@ -203,13 +203,19 @@ def handle_xmr_block(params):
                 data = key.replace(XMR_PREFIX, '')
                 
                 # 判断用户名长度
-                if len(data) > 50:
-                    # 如果长度超过50，使用原来的分割逻辑
-                    username = data.split(':')[1]
-                    xmr_wallet[username] = data.split(':')[0]
-                    tari_wallet[username] = data.split(':')[1]
+                if len(data) > 50 and ':' in data:
+                    # 如果长度超过50且包含冒号，使用分割逻辑
+                    parts = data.split(':')
+                    if len(parts) >= 2:
+                        username = parts[1]
+                        xmr_wallet[username] = parts[0]
+                        tari_wallet[username] = parts[1]
+                    else:
+                        username = data
+                        xmr_wallet[username] = ""
+                        tari_wallet[username] = ""
                 else:
-                    # 如果长度不超过50，直接使用整个字符串作为用户名
+                    # 如果长度不超过50或不包含冒号，直接使用整个字符串作为用户名
                     username = data
                     xmr_wallet[username] = ""
                     tari_wallet[username] = ""
@@ -354,13 +360,19 @@ def handle_tari_block(params):
                 # 只删除前缀，保留完整的用户名
                 data    = key.replace(TARI_PREFIX, '')
                                 # 判断用户名长度
-                if len(data) > 50:
-                    # 如果长度超过50，使用原来的分割逻辑
-                    username = data.split(':')[1]
-                    xmr_wallet[username] = data.split(':')[0]
-                    tari_wallet[username] = data.split(':')[1]
+                if len(data) > 50 and ':' in data:
+                    # 如果长度超过50且包含冒号，使用分割逻辑
+                    parts = data.split(':')
+                    if len(parts) >= 2:
+                        username = parts[1]
+                        xmr_wallet[username] = parts[0]
+                        tari_wallet[username] = parts[1]
+                    else:
+                        username = data
+                        xmr_wallet[username] = ""
+                        tari_wallet[username] = ""
                 else:
-                    # 如果长度不超过50，直接使用整个字符串作为用户名
+                    # 如果长度不超过50或不包含冒号，直接使用整个字符串作为用户名
                     username = data
                     xmr_wallet[username] = ""
                     tari_wallet[username] = ""
