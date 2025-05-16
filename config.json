@@ -9,7 +9,7 @@
         "host": "localhost",
         "port": 5432,
         "database": "p2pool",
-        "user": "p2pool_user",
+        "user": "postgres",
         "password": "lks3v9dksadh"
     }
 } 
