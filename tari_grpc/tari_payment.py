@@ -321,7 +321,12 @@ class TariPayment:
             return True
         response = input(f"\n{message} (y/n): ").lower().strip()
         return response == 'y'
-
+    
+    def confirm_action_force(self, message):
+        """确认操作"""
+        response = input(f"\n{message} (y/n): ").lower().strip()
+        return response == 'y'
+    
     def format_username(self, username):
         """格式化用户名显示（显示前5位和后5位）"""
         if len(username) <= 10:
@@ -337,7 +342,7 @@ class TariPayment:
             # 插入待处理的支付记录
             self.cursor.execute("""
                 INSERT INTO payment (username, type, amount, txid, time, status, note)
-                VALUES (%s, 'tari', %s, NULL, %s, 'pending', '待发送')
+                VALUES (%s, 'tari', %s, "-", %s, 'pending', '待发送')
             """, (username, amount, datetime.now()))
             
             # 更新用户余额
@@ -377,7 +382,7 @@ class TariPayment:
                 WHERE username = %s 
                 AND amount = %s 
                 AND status = 'pending' 
-                AND txid IS NULL
+                AND txid = "-"
                 RETURNING id
             """, (txid, status, note, username, amount))
             
@@ -394,7 +399,7 @@ class TariPayment:
             logger.error(f"更新支付状态失败: {str(e)}")
             return False
 
-    def run(self):
+    def run(self): 
         """运行自动支付程序"""
         logger.info("启动Tari支付程序...")
         
@@ -441,7 +446,7 @@ class TariPayment:
                 return
                 
             # 4. 确认是否继续支付（即使自动确认模式也需要此确认）
-            if not self.confirm_action("是否确认开始支付?"):
+            if not self.confirm_action_force("是否确认开始支付?"):
                 logger.info("操作员取消了支付操作")
                 return
             
