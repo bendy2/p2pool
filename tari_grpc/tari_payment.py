@@ -221,7 +221,7 @@ class TariPayment:
             logger.info(f"用户 {user_id} 最近18小时奖励: {recent_rewards} TARI")
             logger.info(f"用户 {user_id} 可用余额: {available_balance} TARI")
             
-            return available_balance
+            return floor(available_balance)
         except Exception as e:
             logger.error(f"计算用户 {user_id} 可用余额失败: {str(e)}")
             return Decimal('0')
@@ -250,7 +250,7 @@ class TariPayment:
                     exit()
                     continue
                 
-                logger.info(f"开始处理用户 {user_id} 的支付目标: ID={user_id}, 地址={address}, 金额={amount}")
+                logger.info(f"开始处理用户 {user_id} 的支付目标: ID={user_id}, 地址={address}, 金额={available_balance}")
                 exit()
                 # 发送交易
                 txid = self.send_transaction(address, amount)
