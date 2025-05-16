@@ -108,7 +108,7 @@ class TariPayment:
             if hasattr(note, 'tx_id'):  # 检查是否是TransactionInfo对象
                 note_dict = MessageToDict(
                     note,
-                    including_default_value_fields=True,
+                    including_default_values=True,
                     preserving_proto_field_name=True
                 )
                 note = json.dumps(note_dict, ensure_ascii=False)
