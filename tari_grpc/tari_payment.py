@@ -305,9 +305,6 @@ class TariPayment:
                     })
                     total_payment_amount += Decimal(str(available_balance))
             
-            # 按可用余额倒序排序
-            payment_list.sort(key=lambda x: x['available_balance'], reverse=True)
-            
             # 3. 显示待支付信息
             if payment_list:
                 print("\n待支付列表:")
@@ -316,7 +313,8 @@ class TariPayment:
                 print("-" * 50)
                 
                 for i, payment in enumerate(payment_list, 1):
-                    print(f"{i:<6} {payment['username']:<20} {payment['available_balance']:<15.2f}")
+                    formatted_username = self.format_username(payment['username'])
+                    print(f"{i:<6} {formatted_username:<20} {payment['available_balance']:<15.2f}")
                 
                 print("-" * 50)
                 print(f"总计待支付: {len(payment_list)} 笔")
@@ -336,7 +334,8 @@ class TariPayment:
                 amount = payment['available_balance']
                 address = payment['wallet']
                 
-                print(f"\n[{i}/{len(payment_list)}] 准备支付: {username} - {amount:.2f} TARI")
+                formatted_username = self.format_username(username)
+                print(f"\n[{i}/{len(payment_list)}] 准备支付: {formatted_username} - {amount:.2f} TARI")
                 if not self.confirm_action("是否继续这笔支付?"):
                     logger.info(f"跳过用户 {username} 的支付")
                     continue
