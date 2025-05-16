@@ -271,6 +271,12 @@ class TariPayment:
         response = input(f"\n{message} (y/n): ").lower().strip()
         return response == 'y'
 
+    def format_username(self, username):
+        """格式化用户名显示（显示前5位和后5位）"""
+        if len(username) <= 10:
+            return username
+        return f"{username[:5]}...{username[-5:]}"
+
     def run(self):
         """运行自动支付程序"""
         logger.info("启动Tari支付程序...")
@@ -302,14 +308,15 @@ class TariPayment:
             # 3. 显示待支付信息
             if payment_list:
                 print("\n待支付列表:")
-                print("-" * 80)
-                print(f"{'序号':<6} {'用户名':<20} {'支付金额(TARI)':<15} {'钱包地址'}")
-                print("-" * 80)
+                print("-" * 50)
+                print(f"{'序号':<6} {'用户名':<20} {'支付金额(TARI)':<15}")
+                print("-" * 50)
                 
                 for i, payment in enumerate(payment_list, 1):
-                    print(f"{i:<6} {payment['username']:<20} {payment['available_balance']:<15.2f} {payment['wallet']}")
+                    formatted_username = self.format_username(payment['username'])
+                    print(f"{i:<6} {formatted_username:<20} {payment['available_balance']:<15.2f}")
                 
-                print("-" * 80)
+                print("-" * 50)
                 print(f"总计待支付: {len(payment_list)} 笔")
                 print(f"总计金额: {total_payment_amount:.2f} TARI")
             else:
@@ -327,7 +334,8 @@ class TariPayment:
                 amount = payment['available_balance']
                 address = payment['wallet']
                 
-                print(f"\n[{i}/{len(payment_list)}] 准备支付: {username} - {amount:.2f} TARI")
+                formatted_username = self.format_username(username)
+                print(f"\n[{i}/{len(payment_list)}] 准备支付: {formatted_username} - {amount:.2f} TARI")
                 if not self.confirm_action("是否继续这笔支付?"):
                     logger.info(f"跳过用户 {username} 的支付")
                     continue
