@@ -65,6 +65,8 @@
                                 <div class="wallet-balance">
                                     <span class="label">余额：</span>
                                     <span id="xmr-balance" class="balance-value">0.000000 XMR</span>
+                                    <span class="label">已支付：</span>
+                                    <span id="xmr-payed" class="balance-value">0.000000 XMR</span>
                                 </div>
                             </div>
                             <div class="wallet-address-container">
@@ -82,11 +84,14 @@
                     <div class="col-12">
                         <div class="wallet-section">
                             <div class="wallet-header">
-                                <div class="wallet-title">TARI钱包</div>
+                                <div class="wallet-title">TARI钱包(会有18小时的锁定期)</div>
                                 <div class="wallet-balance">
                                     <span class="label">余额：</span>
                                     <span id="tari-balance" class="balance-value">0.00 XTM</span>
-                                    <span class="text-warning ms-2">(冻结：<span id="frozen-tari" class="balance-value">0.00 XTM</span>)</span>
+                                    <span class="text-warning">锁定：</span>
+                                    <span id="frozen-tari" class="balance-value">0.00 XTM</span>
+                                    <span class="text-label">已支付：</span>
+                                    <span id="tari-payed" class="balance-value">0.00 XTM</span>
                                 </div>
                             </div>
                             <div class="wallet-address-container">

@@ -112,11 +112,13 @@ function updateUserInfo() {
             // 更新钱包地址
             document.getElementById('xmr-wallet').textContent = data.xmr_wallet || '未设置';
             document.getElementById('tari-wallet').textContent = data.tari_wallet || '未设置';
+            document.getElementById('xmr-payed').textContent = formatXMR(data.xmr_payed);
             
             // 更新余额
             document.getElementById('xmr-balance').textContent = formatXMR(data.xmr_balance);
             document.getElementById('tari-balance').textContent = formatTARI(data.tari_balance);
             document.getElementById('frozen-tari').textContent = formatTARI(data.frozen_tari);
+            document.getElementById('tari-payed').textContent = formatTARI(data.tari_payed);
             // 更新奖励历史
             updateRewardsList(data.rewards);
             

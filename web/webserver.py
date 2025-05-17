@@ -259,7 +259,25 @@ def user_info(username):
         """, (username,))
         frozen_result = cur.fetchone()
         frozen_tari = float(frozen_result['frozen_tari']) if frozen_result else 0
-        
+        # 计算已支付的TARI
+        cur.execute("""
+            SELECT COALESCE(SUM(amount), 0) as tari_payed
+            FROM payment 
+            WHERE username = %s 
+            AND type = 'tari'
+            AND status = 'completed'
+        """, (username,))   
+        tari_payed_result = cur.fetchone()
+        tari_payed = float(tari_payed_result['tari_payed']) if tari_payed_result else 0
+        #计算已支付的XMR
+        cur.execute("""
+            SELECT COALESCE(SUM(amount), 0) as xmr_payed
+            FROM payment 
+            WHERE username = %s 
+            AND type = 'xmr'
+        """, (username,))
+        xmr_payed_result = cur.fetchone()
+        xmr_payed = float(xmr_payed_result['xmr_payed']) if xmr_payed_result else 0
         
         # 获取用户奖励历史
         cur.execute("""
@@ -311,7 +329,9 @@ def user_info(username):
         return jsonify({
             'username': username,
             'xmr_balance': float(account['xmr_balance']),
-            'tari_balance': float(account['tari_balance']),
+            'tari_balance': float(account['tari_balance'])-frozen_tari,
+            'xmr_payed': float(account['xmr_payed']),
+            'tari_payed': float(account['tari_payed']),
             'created_at': account['created_at'].isoformat(),
             'current_hashrate': current_hashrate,
             'xmr_wallet': account['xmr_wallet'],
