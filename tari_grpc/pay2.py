@@ -297,16 +297,7 @@ class TariPayment:
             ''')
             targets = self.cursor.fetchall()
             
-            # 过滤出有效的钱包地址
-            valid_targets = []
-            for target in targets:
-                username, balance, wallet = target
-                if not is_valid_tari_address(wallet):
-                    logger.warning(f"用户 {username} 的钱包地址无效: {wallet}")
-                    continue
-                valid_targets.append(target)
-                
-            return valid_targets
+            return targets
             
         except Exception as e:
             logger.error(f"获取支付目标失败: {str(e)}")
