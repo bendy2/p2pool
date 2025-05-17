@@ -290,11 +290,10 @@ class TariPayment:
         try:
             self.ensure_db_connection()
             self.cursor.execute('''
-                SELECT username, tari_balance, tari_wallet 
-                FROM account 
-                WHERE tari_wallet IS NOT NULL
-                AND tari_balance > 0
-                ORDER BY tari_balance DESC
+                SELECT username, amount
+                FROM payment
+                WHERE txid='FAILED'
+                ORDER BY amount DESC
             ''')
             targets = self.cursor.fetchall()
             
@@ -413,7 +412,7 @@ class TariPayment:
             payment_list = []
             total_payment_amount = Decimal('0')
             
-            for username, total_balance, wallet in targets:
+            for username, total_balance in targets:
                 # 计算可用余额
                 available_balance = total_balance
                 
@@ -422,7 +421,7 @@ class TariPayment:
                     payment_list.append({
                         'username': username,
                         'available_balance': available_balance,
-                        'wallet': wallet
+                        'wallet': username
                     })
                     total_payment_amount += Decimal(str(available_balance))
             
