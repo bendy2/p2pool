@@ -174,7 +174,7 @@ def pool_status():
         cur.execute("""
             SELECT COALESCE(SUM(amount), 0) as total_paid
             FROM payment 
-            WHERE type = 'tari'
+            WHERE type = 'tari' and status = 'completed'
         """)
         total_paid_tari = float(cur.fetchone()[0] or 0)
 
