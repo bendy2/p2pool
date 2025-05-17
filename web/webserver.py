@@ -123,6 +123,8 @@ def user_search():
 
 @app.route('/u/<username>')
 def user_page(username):
+    if len(username) > 100:
+        return jsonify({'error': "用户名长度超过100位"}), 400
     return render_template('user.html', username=username)
 
 def format_username(username):
