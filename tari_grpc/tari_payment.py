@@ -51,7 +51,7 @@ def is_valid_tari_address(address):
     allowed_chars = set("123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz")
     if not set(address).issubset(allowed_chars):
         return False
-    if len(address) != 91:
+    if len(address) not in  [91,90]:
         logger.info(len(address))
         return False
         
