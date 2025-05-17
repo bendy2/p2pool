@@ -116,7 +116,9 @@ def mark_block_invalid(block_id):
             cursor.execute("""
                 UPDATE blocks
                 SET is_valid = FALSE,
-                    rewards = 0
+                    rewards = 0,
+                    is_valid = FALSE,
+                    check_status = FALSE
                 WHERE block_height = %s
             """, (block_height,))
             
