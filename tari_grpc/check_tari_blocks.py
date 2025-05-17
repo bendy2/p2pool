@@ -83,7 +83,7 @@ class TariBlockChecker:
             self.cursor.execute("""
                 SELECT block_height, rewards, total_shares, time
                 FROM blocks 
-                WHERE type = 'tari' and check_status = false
+                WHERE type = 'tari' and is_valid = false
                 ORDER BY block_height DESC
             """)
             return self.cursor.fetchall()
