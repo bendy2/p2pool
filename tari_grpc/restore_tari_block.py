@@ -159,9 +159,9 @@ class TariBlockRestorer:
                 # 插入奖励记录
                 self.cursor.execute("""
                     INSERT INTO rewards (
-                        block_height, type, username, reward, shares, created_at
+                        block_height, type, username, reward, shares,time
                     ) VALUES (
-                        %s, 'tari', %s, %s, %s, CURRENT_TIMESTAMP
+                        %s, 'tari', %s, %s, %s, %s
                     )
                 """, (block_height, username, user_reward, user_shares))
                 
