@@ -1,3 +1,6 @@
+<!-- Disqus 公告组件 -->
+<div id="disqus_thread" class="mb-4"></div>
+
 <!-- 在矿池状态卡片后，区块信息前添加 -->
 <div class="card mb-4">
     <div class="card-body">
@@ -32,4 +35,18 @@
 </div>
 
 <!-- 在页面底部添加 Chart.js 库 -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script> 
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<!-- Disqus 配置 -->
+<script>
+    var disqus_config = function () {
+        this.page.url = window.location.href;
+        this.page.identifier = 'pool-announcements';
+    };
+    (function() {
+        var d = document, s = d.createElement('script');
+        s.src = 'https://YOUR_DISQUS_SHORTNAME.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', +new Date());
+        (d.head || d.body).appendChild(s);
+    })();
+</script> 
