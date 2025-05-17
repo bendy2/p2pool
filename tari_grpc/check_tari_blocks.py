@@ -83,7 +83,7 @@ class TariBlockChecker:
             self.cursor.execute("""
                 SELECT block_height, rewards, total_shares, time
                 FROM blocks 
-                WHERE type = 'tari'
+                WHERE type = 'tari' and check_status = false
                 ORDER BY block_height DESC
             """)
             return self.cursor.fetchall()
@@ -113,8 +113,11 @@ class TariBlockChecker:
                 }
 
             # 获取区块时间
-            timestamp = header.get('timestamp', 0)
-            block_time = datetime.fromtimestamp(timestamp)
+            try:
+                timestamp = int(header.get('timestamp', 0))
+                block_time = datetime.fromtimestamp(timestamp)
+            except (ValueError, TypeError):
+                block_time = 'N/A'
 
             return {
                 'height': block_height,
