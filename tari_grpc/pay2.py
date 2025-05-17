@@ -141,12 +141,12 @@ class TariPayment:
         """获取下一个支付目标"""
         try:
             self.cursor.execute('''
-                SELECT username, amount 
-                FROM account 
+                SELECT username, amount  
+                FROM payment
                 WHERE txid='FAILED'
                 ORDER BY amount DESC
                 LIMIT 1
-            ''')
+            ''', (self.min_payout,))
             target = self.cursor.fetchone()
             return target
         except Exception as e:
@@ -413,10 +413,9 @@ class TariPayment:
             payment_list = []
             total_payment_amount = Decimal('0')
             
-            for username, total_balance in targets:
+            for username, total_balance, wallet in targets:
                 # 计算可用余额
-                wallet = username
-                available_balance = self.get_available_balance(username, total_balance)
+                available_balance = total_balance
                 
                 # 检查是否满足最小支付额度
                 if available_balance >= self.min_payout:
@@ -488,7 +487,6 @@ class TariPayment:
                 else:
                     logger.error("发送交易失败")
                     self.update_payment_status(username, amount, "FAILED", None, "failed")
-                    exit()
                 
                 # 每笔交易后等待
                 time.sleep(5)
