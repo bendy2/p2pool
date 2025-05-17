@@ -88,8 +88,7 @@ class PaymentFixer:
         try:
             self.cursor.execute("""
                 UPDATE payment
-                SET txid = 'FIXED',
-                    updated_at = CURRENT_TIMESTAMP
+                SET txid = 'FIXED'
                 WHERE txid = 'FAILED'
                 AND username = %s
                 AND amount = %s
