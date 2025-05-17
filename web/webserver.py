@@ -331,7 +331,7 @@ def user_info(username):
             'xmr_balance': float(account['xmr_balance']),
             'tari_balance': float(account['tari_balance'])-frozen_tari,
             'xmr_payed': xmr_payed,
-            'tari_payed': tari_payed),
+            'tari_payed': tari_payed,
             'created_at': account['created_at'].isoformat(),
             'current_hashrate': current_hashrate,
             'xmr_wallet': account['xmr_wallet'],
