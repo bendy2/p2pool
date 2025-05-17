@@ -159,6 +159,8 @@ class TariBlockChecker:
         print(f"\n开始检查 {total_blocks} 个TARI区块...")
         
         for block in blocks:
+            block_height = block[0]
+            block_id = block[4]
             
             result = self.check_block(block)
             
@@ -174,7 +176,7 @@ class TariBlockChecker:
 
             # 添加到结果列表
             results.append([
-                block_height,
+                block_height,   
                 result['status'],
                 result['message'],
                 result.get('block_time', 'N/A')
