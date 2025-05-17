@@ -1077,7 +1077,8 @@ class TariBlockChecker(threading.Thread):
             
             # 4. 删除奖励记录
             cur.execute("""
-                DELETE FROM rewards 
+                UPDATE rewards 
+                        set reward = 0
                 WHERE block_height = %s
             """, (block_height,))
             
