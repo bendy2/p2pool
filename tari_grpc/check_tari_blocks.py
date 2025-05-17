@@ -81,7 +81,7 @@ class TariBlockChecker:
         """获取所有TARI区块"""
         try:
             self.cursor.execute("""
-                SELECT block_height, rewards, total_shares, time
+                SELECT block_height, rewards, total_shares, time,block_id
                 FROM blocks 
                 WHERE type = 'tari' and is_valid = false
                 ORDER BY block_height DESC
@@ -91,8 +91,10 @@ class TariBlockChecker:
             logger.error(f"获取区块列表失败: {e}")
             return []
 
-    def check_block(self, block_height):
+    def check_block(self, block):
         """检查单个区块的有效性"""
+        block_height = block[0]
+        block_id = block[4]
         try:
             # 从API获取区块数据
             api_data = self.get_block_from_api(block_height)
@@ -110,6 +112,12 @@ class TariBlockChecker:
                     'height': block_height,
                     'status': 'INVALID',
                     'message': '区块数据不完整'
+                }
+            if block_id != self.buffer_to_hex(header.get('hash', {})):
+                return {
+                    'height': block_height,
+                    'status': 'INVALID',
+                    'message': '区块哈希不匹配'
                 }
 
             # 获取区块时间
@@ -151,8 +159,8 @@ class TariBlockChecker:
         print(f"\n开始检查 {total_blocks} 个TARI区块...")
         
         for block in blocks:
-            block_height = block[0]
-            result = self.check_block(block_height)
+            
+            result = self.check_block(block)
             
             # 统计结果
             if result['status'] == 'VALID':
