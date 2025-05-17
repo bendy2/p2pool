@@ -76,7 +76,37 @@ class TariBlockRestorer:
             logger.error(f"获取区块 {height} 数据失败: {e}")
             return None
 
-    def restore_block(self, block_height):
+    def get_reference_block_shares(self, reference_height):
+        """获取参考区块的用户份额分布"""
+        try:
+            self.cursor.execute("""
+                SELECT username, shares
+                FROM rewards 
+                WHERE block_height = %s 
+                AND type = 'tari'
+            """, (reference_height,))
+            
+            shares_data = self.cursor.fetchall()
+            if not shares_data:
+                logger.error(f"未找到参考区块 {reference_height} 的份额数据")
+                return None
+
+            # 计算总份额
+            total_shares = sum(shares for _, shares in shares_data)
+            
+            # 计算每个用户的份额比例
+            share_ratios = {
+                username: Decimal(str(shares)) / Decimal(str(total_shares))
+                for username, shares in shares_data
+            }
+            
+            return share_ratios, total_shares
+
+        except Exception as e:
+            logger.error(f"获取参考区块份额数据失败: {e}")
+            return None
+
+    def restore_block(self, block_height, reference_height):
         """恢复指定区块的奖励"""
         try:
             # 1. 获取区块信息
@@ -108,30 +138,42 @@ class TariBlockRestorer:
                 logger.error(f"区块 {block_height} 未找到远程哈希")
                 return False
 
-            # 4. 开始恢复过程
+            # 4. 获取参考区块的份额分布
+            reference_data = self.get_reference_block_shares(reference_height)
+            if not reference_data:
+                return False
+
+            share_ratios, ref_total_shares = reference_data
+
+            # 5. 开始恢复过程
             self.cursor.execute("BEGIN")
 
-            # 5. 获取原始奖励记录
-            self.cursor.execute("""
-                SELECT username, reward, shares
-                FROM rewards 
-                WHERE block_height = %s 
-                AND type = 'tari'
-            """, (block_height,))
-            
-            rewards_data = self.cursor.fetchall()
-            
-            # 6. 恢复用户奖励
-            for username, reward, shares in rewards_data:
+            # 6. 计算并恢复用户奖励
+            for username, ratio in share_ratios.items():
+                # 计算用户份额
+                user_shares = int(total_shares * ratio)
+                
+                # 计算用户奖励
+                user_reward = Decimal(str(rewards)) * ratio
+                
+                # 插入奖励记录
+                self.cursor.execute("""
+                    INSERT INTO rewards (
+                        block_height, type, username, reward, shares, created_at
+                    ) VALUES (
+                        %s, 'tari', %s, %s, %s, CURRENT_TIMESTAMP
+                    )
+                """, (block_height, username, user_reward, user_shares))
+                
                 # 更新用户余额
                 self.cursor.execute("""
                     UPDATE account 
                     SET tari_balance = tari_balance + %s,
                         updated_at = CURRENT_TIMESTAMP
                     WHERE username = %s
-                """, (reward, username))
+                """, (user_reward, username))
                 
-                logger.info(f"已恢复用户 {username} 的奖励: {reward} TARI")
+                logger.info(f"已恢复用户 {username} 的奖励: {user_reward} TARI (份额: {user_shares})")
 
             # 7. 提交事务
             self.conn.commit()
@@ -143,14 +185,14 @@ class TariBlockRestorer:
             logger.error(f"恢复区块 {block_height} 时发生错误: {e}")
             return False
 
-    def restore_blocks(self, block_heights):
+    def restore_blocks(self, block_heights, reference_height):
         """恢复多个区块的奖励"""
         success_count = 0
         fail_count = 0
         
         for height in block_heights:
             logger.info(f"开始恢复区块 {height}")
-            if self.restore_block(height):
+            if self.restore_block(height, reference_height):
                 success_count += 1
             else:
                 fail_count += 1
@@ -163,19 +205,23 @@ def main():
         # 创建恢复器实例
         restorer = TariBlockRestorer()
         
-        # 从命令行获取区块高度列表
+        # 从命令行获取区块高度列表和参考区块高度
         import sys
-        if len(sys.argv) < 2:
-            print("使用方法: python3 restore_tari_block.py <block_height1> [block_height2 ...]")
+        if len(sys.argv) < 3:
+            print("使用方法: python3 restore_tari_block.py <reference_height> <block_height1> [block_height2 ...]")
             sys.exit(1)
         
+        # 获取参考区块高度
+        reference_height = int(sys.argv[1])
+        
         # 转换区块高度为整数列表
-        block_heights = [int(height) for height in sys.argv[1:]]
+        block_heights = [int(height) for height in sys.argv[2:]]
         
         # 执行恢复
-        success, fail = restorer.restore_blocks(block_heights)
+        success, fail = restorer.restore_blocks(block_heights, reference_height)
         
         print(f"\n恢复结果:")
+        print(f"参考区块: {reference_height}")
         print(f"成功: {success} 个区块")
         print(f"失败: {fail} 个区块")
         
