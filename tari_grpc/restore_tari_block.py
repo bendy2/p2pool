@@ -168,8 +168,7 @@ class TariBlockRestorer:
                 # 更新用户余额
                 self.cursor.execute("""
                     UPDATE account 
-                    SET tari_balance = tari_balance + %s,
-                        updated_at = CURRENT_TIMESTAMP
+                    SET tari_balance = tari_balance + %s
                     WHERE username = %s
                 """, (user_reward, username))
                 
