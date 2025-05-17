@@ -175,16 +175,16 @@ class TariPayment:
                     INSERT INTO payment (username, type, amount, txid, time, status, note)
                     VALUES (%s, 'tari', %s, %s, %s, %s, %s)
                 """, (username, amount, txid, datetime.now(), status, note))
-                
+                if status == 'completed':
                 # 更新用户余额（只减去实际支付的金额和手续费）
-                self.cursor.execute("""
-                    UPDATE account 
-                    SET tari_balance = tari_balance - %s 
-                    WHERE username = %s
-                """, (amount, username))
-                
-                self.conn.commit()
-                logger.info(f"成功记录支付信息: 用户={username}, 金额={amount}, 交易ID={txid}")
+                    self.cursor.execute("""
+                        UPDATE account 
+                        SET tari_balance = tari_balance - %s 
+                        WHERE username = %s
+                    """, (amount, username))
+                    
+                    self.conn.commit()
+                    logger.info(f"成功记录支付信息: 用户={username}, 金额={amount}, 交易ID={txid}")
                 break
                 
             except Exception as e:
