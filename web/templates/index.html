@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tari-Cpu P2pool分享池</title>
+    <title>Tari-Cpu TPOOL分享池</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
 </head>
@@ -13,7 +13,7 @@
             <a class="navbar-brand" href="/">Tari-Cpu</a>   <a href="https://t.me/+FShj1uLvag0zYTRl" target="_blank">TG交流群</a>
             <div class="d-flex">
                 <form class="d-flex" action="/u/" method="get">
-                    <input class="form-control me-2" type="search" name="username" placeholder="输入用户名" required>
+                    <input class="form-control me-20" type="search" name="username" placeholder="输入用户名(TARI钱包地址)" required>
                     <button class="btn btn-outline-light" type="submit">查询</button>
                 </form>
             </div>
@@ -153,15 +153,14 @@
                                 <li>支持XMR和TARI双挖</li>
                                 <li>低费率，高收益.双倍收益.爽歪歪</li>
                                 <li>实时收益计算.只要有SHARE提交(软件上能看见) 就可以有收益! </li>
-                                <li>门罗币每隔4小时支付.起付点 0.01XMR</li>
-                                <li>TARI币爆块冻结18小时.同样每隔4小时自动支付  起付点 100XTM</li>
+                                <li>门罗币起付点 0.01XMR 无锁定期.TARI币爆块网络锁定18小时,起付点100XTM</li>
+                                <li>其于安全理由.每天中午12点和凌晨12点 统一支付</li>
                                 <li>在页面左上角输入TARI地址或者 自定义的-u用户名 查看信息</li>
                             </ul>
                             
                             <h4>挖矿配置</h4>
                             <div class="config-example">
-                                <pre><code>./xmrig -o tari.tpool.pro:33333 -u  XMR_WALLER_ADDRESS:TARI_WALLER_ADDRESS</code>  <br>
-                                    请严格按这格式作为-u参数作为用户名..不要添加其他参数.   尽快使用xmrig-proxy来将同一局域网内多台机器集中-中转一下...如果多机器直连矿池..矿池记录的算力会虚高.</pre>
+                                <pre><code>./xmrig -o tari.tpool.pro:33333 -u  XMR_WALLER_ADDRESS:TARI_WALLER_ADDRESS</code><br>请严格按这格式作为-u参数作为用户名..不要添加其他参数. <BR>尽快使用xmrig-proxy来将同一局域网内多台机器集中-中转一下...如果多机器直连矿池..矿池记录的算力会虚高.</pre>
                                 <pre>代理连接方法:  ./xmrig-proxy -b 0.0.0.0:12345  -o  -o tari.tpool.pro:33333 -u  XMR_WALLER_ADDRESS:TARI_WALLER_ADDRES 代理 连接后..所有机器就连接代理 即可.../xmrig -o 192.168.0.2:12345   (假设PROXY的内网IP是192.168.0.2 ) </pre>
                             </div>
                             
