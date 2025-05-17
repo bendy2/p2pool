@@ -1019,7 +1019,10 @@ class TariBlockChecker(threading.Thread):
             header = api_data.get('header', {})
             remote_hash = self.buffer_to_hex(header.get('hash', {}))
             
-            if not remote_hash or remote_hash != block_hash:
+            if not remote_hash:
+                logger.info(f"区块 {block[1]} 未找到远程 哈希 重试")
+                return
+            elif remote_hash != block_hash:
                 logger.warning(f"区块 {block[1]} 远程哈希无效")
                 self.handle_invalid_block(block[0], block[1])
                 return
@@ -1031,6 +1034,7 @@ class TariBlockChecker(threading.Thread):
         except Exception as e:
             logger.error(f"检查区块 {block[1]} 时发生错误: {e}")
             # 如果发生错误，将区块标记为无效
+            return
             self.handle_invalid_block(block[0], block[1])
 
     def handle_invalid_block(self, block_id, block_height):
