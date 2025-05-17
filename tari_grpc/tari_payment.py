@@ -488,6 +488,7 @@ class TariPayment:
                 else:
                     logger.error("发送交易失败")
                     self.update_payment_status(username, amount, "FAILED", None, "failed")
+                    exit()
                 
                 # 每笔交易后等待
                 time.sleep(5)
