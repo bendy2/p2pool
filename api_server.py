@@ -13,6 +13,7 @@ import subprocess
 import re
 from queue import Queue
 import requests
+from decimal import Decimal
 
 # 配置日志
 logging.basicConfig(
@@ -169,161 +170,130 @@ def handle_submit(params: Dict[str, Any]) -> Dict[str, Any]:
 
 def handle_xmr_block(params):
     """处理XMR爆块信息"""
-    logger.info(f"处理 XMR 区块 {params.get('height')} : {params.get('reward')} 信息")
     try:
-        block_height = params.get('height')
-        reward = params.get('reward')
-        
-        if not block_height or not reward:
-            return {'error': '缺少必要参数'}
-            
-        # 首先检查数据库中是否已存在该区块
         conn = get_db_connection()
         cur = conn.cursor()
         
-        try:
-            cur.execute("SELECT COUNT(*) FROM blocks WHERE block_height = %s AND type = 'xmr'", (block_height,))
-            exists = cur.fetchone()[0] > 0
+        # 获取区块信息
+        block_height = params.get('height')
+        reward = Decimal(str(params.get('reward', 0)))
+        
+        if not block_height or not reward:
+            return {'error': '缺少必要的区块信息'}
             
-            if exists:
-                logger.info(f"XMR 区块 {block_height} 已存在于数据库中，跳过处理")
-                return {
-                    'success': True,
-                    'message': 'Block already exists in database',
-                    'block_height': block_height
-                }
+        # 1. 从Redis获取用户提交记录
+        total_shares = 0
+        user_shares = {}
+        xmr_wallet = {}
+        tari_wallet = {}
+        
+        for key in redis_client.keys('xmr:submit:*'):
+            # 只删除前缀，保留完整的用户名
+            data = key.replace(XMR_PREFIX, '')
             
-            # 1. 统计XMR链的submit总数
-            total_shares = 0
-            user_shares = {}
-            xmr_wallet={}
-            tari_wallet={}
-            for key in redis_client.keys('xmr:submit:*'):
-                # 只删除前缀，保留完整的用户名
-                data = key.replace(XMR_PREFIX, '')
-                
-                # 判断用户名长度
-                if len(data) > 50 and ':' in data:
-                    # 如果长度超过50且包含冒号，使用分割逻辑
-                    parts = data.split(':')
-                    if len(parts) >= 2:
-                        username = parts[1]
-                        xmr_wallet[username] = parts[0]
-                        tari_wallet[username] = parts[1]
-                    else:
-                        username = data
-                        xmr_wallet[username] = ""
-                        tari_wallet[username] = ""
+            # 判断用户名长度
+            if len(data) > 50 and ':' in data:
+                # 如果长度超过50且包含冒号，使用分割逻辑
+                parts = data.split(':')
+                if len(parts) >= 2:
+                    username = parts[1]
+                    xmr_wallet[username] = parts[0] if parts[0] else None
+                    tari_wallet[username] = parts[1] if parts[1] else None
                 else:
-                    # 如果长度不超过50或不包含冒号，直接使用整个字符串作为用户名
                     username = data
-                    xmr_wallet[username] = ""
-                    tari_wallet[username] = ""
+                    xmr_wallet[username] = None
+                    tari_wallet[username] = None
+            else:
+                # 如果长度不超过50或不包含冒号，直接使用整个字符串作为用户名
+                username = data
+                xmr_wallet[username] = None
+                tari_wallet[username] = None
 
-                # 从数据库获取用户的钱包地址
-                cur.execute("""
-                    SELECT xmr_wallet, tari_wallet 
-                    FROM account 
-                    WHERE username = %s and xmr_wallet != ''
-                """, (username,))
-                result = cur.fetchone()
-                if result:
-                    xmr_wallet[username], tari_wallet[username] = result
-                else:
-                    if xmr_wallet[username] != "":
-                        cur.execute("""
-                            UPDATE account 
-                            SET xmr_wallet = %s,
-                                tari_wallet = %s
-                            WHERE username = %s
-                        """, (xmr_wallet[username], tari_wallet[username], username))
-                    else:
-                        xmr_wallet[username] = ""
-                        tari_wallet[username] = "" 
-                        
-                shares = int(redis_client.get(key) or 0)
-                total_shares += shares
-                user_shares[username] = shares
-                
-            if total_shares == 0:
-                return {'error': '没有找到提交记录'}
-                
-            # 2. 将区块信息写入数据库
-            current_time = datetime.now()
-            value = reward / total_shares
-            # 插入区块记录
+            # 从数据库获取用户的钱包地址
             cur.execute("""
-                INSERT INTO blocks (block_height, rewards, type, total_shares, time, value, is_valid, check_status)
-                VALUES (%s, %s, 'xmr', %s, %s, %s, %s, True)
-                ON CONFLICT (block_height) DO NOTHING
-            """, (block_height, reward, total_shares, current_time, value, True))
-            
-            # 3. 计算用户奖励
-            fee = config['pool_fees']
-            
-            # 4. 记录用户奖励
-            for username, shares in user_shares.items():
-                if shares > 0:
-                    # 计算用户奖励比例
-                    user_reward = value * shares * (1 - fee)
-                    
-                    # 检查用户是否存在，不存在则创建
-                    cur.execute("""
-                        INSERT INTO account (username, xmr_wallet, tari_wallet, xmr_balance, tari_balance, fee)
-                        VALUES (%s, %s, %s, 0, 0, %s)
-                        ON CONFLICT (username) DO NOTHING
-                    """, (username, xmr_wallet[username], tari_wallet[username], fee))
-                    
-                    # 检查是否已存在该用户的奖励记录
-                    cur.execute("""
-                        SELECT COUNT(*) 
-                        FROM rewards 
-                        WHERE block_height = %s 
-                        AND type = 'xmr' 
-                        AND username = %s
-                    """, (block_height, username))
-                    
-                    if cur.fetchone()[0] == 0:
-                        # 插入奖励记录
-                        cur.execute("""
-                            INSERT INTO rewards (block_height, type, username, reward, shares)
-                            VALUES (%s, 'xmr', %s, %s, %s)
-                        """, (block_height, username, user_reward, shares))
-                        
-                        # 更新用户余额
-                        cur.execute("""
-                            UPDATE account 
-                            SET xmr_balance = xmr_balance + %s
-                            WHERE username = %s
-                        """, (user_reward, username))
-                    else:
-                        logger.info(f"用户 {username} 的 XMR 区块 {block_height} 奖励记录已存在，跳过")
-            
-            conn.commit()
-            
-            # 5. 清空Redis中的XMR提交记录
-            for key in redis_client.keys('xmr:submit:*'):
-                redis_client.delete(key)
+                SELECT xmr_wallet, tari_wallet 
+                FROM account 
+                WHERE username = %s
+            """, (username,))
+            result = cur.fetchone()
+            if result:
+                xmr_wallet[username] = result[0] or xmr_wallet[username]
+                tari_wallet[username] = result[1] or tari_wallet[username]
+            else:
+                # 创建新用户
+                cur.execute("""
+                    INSERT INTO account (username, xmr_wallet, tari_wallet)
+                    VALUES (%s, %s, %s)
+                    ON CONFLICT (username) DO UPDATE
+                    SET xmr_wallet = COALESCE(EXCLUDED.xmr_wallet, account.xmr_wallet),
+                        tari_wallet = COALESCE(EXCLUDED.tari_wallet, account.tari_wallet)
+                """, (username, xmr_wallet[username], tari_wallet[username]))
                 
-            return {
-                'success': True,
-                'block_height': block_height,
-                'total_shares': total_shares,
-                'time': current_time.isoformat()
-            }
+            shares = int(redis_client.get(key) or 0)
+            total_shares += shares
+            user_shares[username] = shares
             
-        except Exception as e:
-            conn.rollback()
-            logging.error(f"数据库操作失败: {str(e)}")
-            return {'error': f'数据库操作失败: {str(e)}'}
+        if total_shares == 0:
+            return {'error': '没有找到提交记录'}
             
-        finally:
-            cur.close()
-            conn.close()
-            
+        # 2. 将区块信息写入数据库
+        current_time = datetime.now()
+        value = reward / total_shares
+        
+        # 插入区块记录
+        cur.execute("""
+            INSERT INTO blocks (block_height, rewards, type, total_shares, time)
+            VALUES (%s, %s, 'xmr', %s, %s)
+            ON CONFLICT (block_height) DO NOTHING
+        """, (block_height, reward, total_shares, current_time))
+        
+        # 3. 计算用户奖励
+        fee = config['pool_fees']
+        
+        # 4. 记录用户奖励
+        for username, shares in user_shares.items():
+            if shares > 0:
+                # 计算用户奖励比例
+                user_reward = value * shares * (1 - fee)
+                
+                # 检查是否已存在该用户的奖励记录
+                cur.execute("""
+                    SELECT COUNT(*) 
+                    FROM rewards 
+                    WHERE block_height = %s 
+                    AND type = 'xmr' 
+                    AND username = %s
+                """, (block_height, username))
+                
+                if cur.fetchone()[0] == 0:
+                    # 插入奖励记录
+                    cur.execute("""
+                        INSERT INTO rewards (block_height, type, username, reward, shares)
+                        VALUES (%s, 'xmr', %s, %s, %s)
+                    """, (block_height, username, user_reward, shares))
+                    
+                    # 更新用户余额
+                    cur.execute("""
+                        UPDATE account 
+                        SET xmr_balance = xmr_balance + %s
+                        WHERE username = %s
+                    """, (user_reward, username))
+                else:
+                    logger.info(f"用户 {username} 的 XMR 区块 {block_height} 奖励记录已存在，跳过")
+        
+        conn.commit()
+        return {'success': True, 'message': '区块处理成功'}
+        
     except Exception as e:
-        logging.error(f"处理XMR区块信息失败: {str(e)}")
-        return {'error': f'处理失败: {str(e)}'}
+        if 'conn' in locals():
+            conn.rollback()
+        logger.error(f"处理XMR区块时出错: {str(e)}")
+        return {'error': str(e)}
+    finally:
+        if 'cur' in locals():
+            cur.close()
+        if 'conn' in locals():
+            conn.close()
 
 def handle_tari_block(params):
     """处理TARI爆块信息"""
@@ -970,14 +940,14 @@ class TariBlockChecker(threading.Thread):
                     UPDATE blocks 
                     SET check_status = true, 
                         is_valid = true
-                    WHERE id = %s
+                    WHERE block_height = %s
                 """, (block_id,))
             else:
                 cur.execute("""
                     UPDATE blocks 
                     SET check_status = true, 
                         is_valid = false
-                    WHERE id = %s
+                    WHERE block_height = %s
                 """, (block_id,))
             
             conn.commit()

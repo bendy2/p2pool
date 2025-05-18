@@ -10,6 +10,6 @@
         "port": 5432,
         "database": "p2pool",
         "user": "postgres",
-        "password": "lks3v9dksadh"
+        "password": "your_password"
     }
 } 

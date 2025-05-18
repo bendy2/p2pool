@@ -10,12 +10,15 @@ CREATE TABLE account (
     username VARCHAR(255) NOT NULL UNIQUE,
     xmr_balance DECIMAL(20, 12) DEFAULT 0,
     tari_balance DECIMAL(20, 12) DEFAULT 0,
+    xmr_wallet VARCHAR(255),
+    tari_wallet VARCHAR(255),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 -- 创建区块记录表
 CREATE TABLE blocks (
+    
     block_height BIGINT PRIMARY KEY,
     rewards DECIMAL(20, 12) NOT NULL,
     type VARCHAR(10) NOT NULL CHECK (type IN ('xmr', 'tari')),
