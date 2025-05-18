@@ -195,6 +195,8 @@ def pool_status():
         
         # 获取在线矿工列表
         online_miners = []
+        miner_xmr_share = {}
+        miner_tari_share = {}
         miner_hashrates = {}  # 用于合并同一用户的算力
         
         for worker in stratum_data['workers']:
@@ -209,6 +211,14 @@ def pool_status():
                         miner_hashrates[username] += hashrate
                     else:
                         miner_hashrates[username] = hashrate
+                        xmr_key = get_chain_key(username, 'xmr')
+                        tari_key = get_chain_key(username, 'tari')
+                        xmr_count = redis_client.get(xmr_key)
+                        tari_count = redis_client.get(tari_key)
+                        xmr_share = int(xmr_count)
+                        tari_share = int(tari_count)
+                        miner_xmr_share[username] = xmr_share
+                        miner_tari_share[username] = tari_share
             except:
                 continue
         
@@ -216,7 +226,9 @@ def pool_status():
         online_miners = [
             {
                 'username': format_username(username),
-                'hashrate': hashrate
+                'hashrate': hashrate,
+                'xmr_share': miner_xmr_share[username],
+                'tari_share': miner_tari_share[username]
             }
             for username, hashrate in miner_hashrates.items()
         ]
@@ -331,10 +343,7 @@ def user_info(username):
         
         # 获取用户当前算力
         current_hashrate = get_user_hashrate(username)
-        xmr_key = get_chain_key(username, 'xmr')
-        tari_key = get_chain_key(username, 'tari')
-        xmr_count = redis_client.get(xmr_key)
-        tari_count = redis_client.get(tari_key)
+
         cur.close()
         conn.close()
         
@@ -351,9 +360,7 @@ def user_info(username):
             'fee': float(account['fee']),
             'frozen_tari': frozen_tari,  # 添
             'rewards': rewards,
-            'payments': payments,
-            'xmr_share': xmr_count,
-            'tari_share': tari_count
+            'payments': payments
         })
     except Exception as e:
         logger.error(f"获取用户信息失败: {str(e)}")
