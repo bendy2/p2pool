@@ -218,13 +218,13 @@ def pool_status():
         for username, hashrate in miner_hashrates.items():
             xmr_key = get_chain_key(username, 'xmr')
             tari_key = get_chain_key(username, 'tari')
-            xmr_count = redis_client.get(xmr_key)
-            tari_count = redis_client.get(tari_key)
+            xmr_count = int(redis_client.get(xmr_key) or 0)
+            tari_count = int(redis_client.get(tari_key) or 0)
             online_miners.append({
                 'username': format_username(username),
                 'hashrate': hashrate,
-                'xmr_share': xmr_count if xmr_count else 0,
-                'tari_share': tari_count if tari_count else 0
+                'xmr_share': xmr_count,
+                'tari_share': tari_count
             })
         
         # 按算力排序并只取前20名
