@@ -223,12 +223,12 @@ def pool_status():
             online_miners.append({
                 'username': format_username(username),
                 'hashrate': hashrate,
-                'xmr_share': xmr_count,
-                'tari_share': tari_count
+                'xmr_share': int(xmr_count),
+                'tari_share': int(tari_count)
             })
         
         # 按算力排序并只取前20名
-        online_miners.sort(key=lambda x: x['tari_share'], reverse=True)
+        online_miners.sort(key=lambda x: x['hashrate'], reverse=True)
         online_miners = online_miners[:20]
 
         return jsonify({
