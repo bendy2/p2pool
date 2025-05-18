@@ -238,7 +238,7 @@ def handle_xmr_block(params):
             
         # 2. 将区块信息写入数据库
         current_time = datetime.now()
-        value = reward / total_shares
+        value = reward / Decimal(str(total_shares))
         
         # 插入区块记录
         cur.execute("""
@@ -248,13 +248,13 @@ def handle_xmr_block(params):
         """, (block_height, reward, total_shares, current_time))
         
         # 3. 计算用户奖励
-        fee = config['pool_fees']
+        fee = Decimal(str(config['pool_fees']))
         
         # 4. 记录用户奖励
         for username, shares in user_shares.items():
             if shares > 0:
                 # 计算用户奖励比例
-                user_reward = value * shares * (1 - fee)
+                user_reward = value * Decimal(str(shares)) * (Decimal('1') - fee)
                 
                 # 检查是否已存在该用户的奖励记录
                 cur.execute("""
