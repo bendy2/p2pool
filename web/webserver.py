@@ -211,27 +211,23 @@ def pool_status():
                         miner_hashrates[username] += hashrate
                     else:
                         miner_hashrates[username] = hashrate
-                        xmr_key = get_chain_key(username, 'xmr')
-                        tari_key = get_chain_key(username, 'tari')
-                        xmr_count = redis_client.get(xmr_key)
-                        tari_count = redis_client.get(tari_key)
-                        xmr_share = int(xmr_count)
-                        tari_share = int(tari_count)
-                        miner_xmr_share[username] = xmr_share
-                        miner_tari_share[username] = tari_share
             except:
                 continue
         
         # 转换为列表并格式化用户名
-        online_miners = [
-            {
+        for username, hashrate in miner_hashrates.items():
+            xmr_key = get_chain_key(username, 'xmr')
+            tari_key = get_chain_key(username, 'tari')
+            xmr_count = redis_client.get(xmr_key)
+            tari_count = redis_client.get(tari_key)
+            xmr_share = int(xmr_count)
+            tari_share = int(tari_count)
+            online_miners.append({
                 'username': format_username(username),
                 'hashrate': hashrate,
-                'xmr_share': miner_xmr_share[username],
-                'tari_share': miner_tari_share[username]
-            }
-            for username, hashrate in miner_hashrates.items()
-        ]
+                'xmr_share': xmr_share,
+                'tari_share': tari_share
+            })
         
         # 按算力排序并只取前20名
         online_miners.sort(key=lambda x: x['hashrate'], reverse=True)
