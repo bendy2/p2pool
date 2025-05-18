@@ -60,11 +60,20 @@ def read_stratum_data():
     except Exception as e:
         logger.error(f"读取stratum数据失败: {str(e)}")
         return None
+    
+def get_chain_key(username: str, chain: str) -> str:
+    """获取Redis键名"""
+    xmr_prefix = "xmr:submit:"
+    tari_prefix = "tari:submit:"
+    if chain.lower() == 'xmr':
+        return f"{xmr_prefix}{username}"
+    else:
+        return f"{tari_prefix}{username}"
 
 def get_user_hashrate(username):
     stratum_data = read_stratum_data()
     total_hashrate = 0
-    
+
     for worker in stratum_data['workers']:
         try:
             # 解析worker数据: "IP:PORT,HASHRATE,SHARES,DIFFICULTY,USERNAME"
@@ -322,7 +331,10 @@ def user_info(username):
         
         # 获取用户当前算力
         current_hashrate = get_user_hashrate(username)
-        
+        xmr_key = get_chain_key(username, 'xmr')
+        tari_key = get_chain_key(username, 'tari')
+        xmr_count = redis_client.get(xmr_key)
+        tari_count = redis_client.get(tari_key)
         cur.close()
         conn.close()
         
@@ -339,7 +351,9 @@ def user_info(username):
             'fee': float(account['fee']),
             'frozen_tari': frozen_tari,  # 添
             'rewards': rewards,
-            'payments': payments
+            'payments': payments,
+            'xmr_share': xmr_count,
+            'tari_share': tari_count
         })
     except Exception as e:
         logger.error(f"获取用户信息失败: {str(e)}")
