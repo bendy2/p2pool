@@ -161,8 +161,8 @@ function updatePoolStatus() {
                 row.innerHTML = `
                     <td><a href="/u/${miner.username}">${miner.username}</a></td>
                     <td>${formatHashrate(miner.hashrate)}</td>
-                    <td>${formatHashrate(miner.xmr_share)}</td>
-                    <td>${formatHashrate(miner.tari_share)}</td>
+                    <td>${miner.xmr_share}</td>
+                    <td>$(miner.tari_share)</td>
                 `;
                 minersList.appendChild(row);
             });
