@@ -394,9 +394,9 @@ def handle_tari_block(params):
             # 插入区块记录
             cur.execute("""
                 INSERT INTO blocks (block_height, rewards, type, total_shares, time, value, is_valid, check_status, block_id)
-                VALUES (%s, %s, 'tari', %s, %s, %s, %s, False, %s)
+                VALUES (%s, %s, 'tari', %s, %s, %s, True, True, %s)
                 ON CONFLICT (block_height) DO NOTHING
-            """, (block_height, reward, total_shares, current_time, value, False, block_id))
+            """, (block_height, reward, total_shares, current_time, value, block_id))
             
             # 3. 计算用户奖励
             fee = config['pool_fees']
