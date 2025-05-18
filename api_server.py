@@ -280,8 +280,18 @@ def handle_xmr_block(params):
                     """, (user_reward, username))
                 else:
                     logger.info(f"用户 {username} 的 XMR 区块 {block_height} 奖励记录已存在，跳过")
-        
         conn.commit()
+        # 5. 清空Redis中的TARI提交记录
+        for key in redis_client.keys('tari:submit:*'):
+            redis_client.delete(key)
+            
+        return {
+            'success': True,
+            'block_height': block_height,
+            'total_shares': total_shares,
+            'reward': reward,
+            'time': current_time.isoformat()
+        }
         return {'success': True, 'message': '区块处理成功'}
         
     except Exception as e:
@@ -998,7 +1008,7 @@ class TariBlockChecker(threading.Thread):
                 return
 
             # 更新区块状态
-            self.update_block_status(block[], True, remote_hash)
+            self.update_block_status(block[2], True, remote_hash)
             logger.info(f"区块 {block[1]} 验证成功")
 
         except Exception as e:
