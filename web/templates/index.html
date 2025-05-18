@@ -20,7 +20,55 @@
         </div>
     </nav>
 
+    <!-- Telegram 公告频道 -->
     <div class="container-fluid mt-4">
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="bi bi-telegram"></i> 矿池公告
+                </h5>
+                <a href="https://t.me/tari_pool_announcements" target="_blank" class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-box-arrow-up-right"></i> 在 Telegram 中查看
+                </a>
+            </div>
+            <div class="card-body p-0">
+                <div class="telegram-embed">
+                    <script async src="https://telegram.org/js/telegram-widget.js?22" 
+                        data-telegram-post="tari_pool_announcements/1" 
+                        data-width="100%" 
+                        data-dark="1"
+                        data-userpic="false"
+                        data-comments="false">
+                    </script>
+                </div>
+            </div>
+        </div>
+
+        <!-- Gitter 聊天室 -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-chat-dots"></i> 矿池公告与讨论</h5>
+            </div>
+            <div class="card-body">
+                <iframe
+                    src="https://gitter.im/tari-pool/community/~embed"
+                    frameborder="0"
+                    scrolling="no"
+                    style="width: 100%; height: 400px;"
+                ></iframe>
+            </div>
+        </div>
+
+        <!-- Disqus 公告板 -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-megaphone"></i> 矿池公告</h5>
+            </div>
+            <div class="card-body">
+                <div id="disqus_thread"></div>
+            </div>
+        </div>
+
         <div class="card mb-4">
             <div class="card-body">
                 <h5 class="card-title">矿池算力走势</h5>
@@ -316,6 +364,7 @@
             chart.resize();
         }
     });
+
     </script>
 </body>
 </html> 
