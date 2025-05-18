@@ -505,6 +505,10 @@ def handle_json_rpc(data):
         result = None
         if method == 'submit':
             result = handle_submit(params)
+        elif method == 'xmr_block2':
+            result = handle_xmr_block(params)
+        elif method == 'tari_block2':
+            result = handle_tari_block(params)
         else:
             raise ValueError(f"Method {method} not found")
         
