@@ -223,8 +223,8 @@ def pool_status():
             online_miners.append({
                 'username': format_username(username),
                 'hashrate': hashrate,
-                'xmr_share': xmr_count,
-                'tari_share': tari_count
+                'xmr_share': xmr_count if xmr_count else 0,
+                'tari_share': tari_count if tari_count else 0
             })
         
         # 按算力排序并只取前20名
