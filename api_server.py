@@ -940,14 +940,14 @@ class TariBlockChecker(threading.Thread):
                     UPDATE blocks 
                     SET check_status = true, 
                         is_valid = true
-                    WHERE block_height = %s
+                    WHERE block_id = %s
                 """, (block_id,))
             else:
                 cur.execute("""
                     UPDATE blocks 
                     SET check_status = true, 
                         is_valid = false
-                    WHERE block_height = %s
+                    WHERE block_id = %s
                 """, (block_id,))
             
             conn.commit()
