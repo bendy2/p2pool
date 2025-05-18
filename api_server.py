@@ -242,10 +242,10 @@ def handle_xmr_block(params):
         
         # 插入区块记录
         cur.execute("""
-            INSERT INTO blocks (block_height, rewards, type, total_shares, time)
-            VALUES (%s, %s, 'xmr', %s, %s)
+            INSERT INTO blocks (block_height, rewards, type, total_shares, time, value, is_valid, check_status, block_id)
+            VALUES (%s, %s, 'xmr', %s, %s, %s, True,True, '-')
             ON CONFLICT (block_height) DO NOTHING
-        """, (block_height, reward, total_shares, current_time))
+        """, (block_height, reward, total_shares, current_time, value))
         
         # 3. 计算用户奖励
         fee = Decimal(str(config['pool_fees']))
@@ -394,7 +394,7 @@ def handle_tari_block(params):
             # 插入区块记录
             cur.execute("""
                 INSERT INTO blocks (block_height, rewards, type, total_shares, time, value, is_valid, check_status, block_id)
-                VALUES (%s, %s, 'tari', %s, %s, %s, True, True, %s)
+                VALUES (%s, %s, 'tari', %s, %s, %s, False, False, %s)
                 ON CONFLICT (block_height) DO NOTHING
             """, (block_height, reward, total_shares, current_time, value, block_id))
             
