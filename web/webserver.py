@@ -220,13 +220,11 @@ def pool_status():
             tari_key = get_chain_key(username, 'tari')
             xmr_count = redis_client.get(xmr_key)
             tari_count = redis_client.get(tari_key)
-            xmr_share = int(xmr_count)
-            tari_share = int(tari_count)
             online_miners.append({
                 'username': format_username(username),
                 'hashrate': hashrate,
-                'xmr_share': xmr_share,
-                'tari_share': tari_share
+                'xmr_share': xmr_count,
+                'tari_share': tari_count
             })
         
         # 按算力排序并只取前20名
