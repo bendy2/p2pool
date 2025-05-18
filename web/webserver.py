@@ -228,7 +228,7 @@ def pool_status():
             })
         
         # 按算力排序并只取前20名
-        online_miners.sort(key=lambda x: x['hashrate'], reverse=True)
+        online_miners.sort(key=lambda x: x['xmr_share'], reverse=True)
         online_miners = online_miners[:20]
 
         return jsonify({
