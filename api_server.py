@@ -238,7 +238,7 @@ def handle_xmr_block(params):
             
         # 2. 将区块信息写入数据库
         current_time = datetime.now()
-        value = reward / Decimal(str(total_shares))
+        value = reward / total_shares
         
         # 插入区块记录
         cur.execute("""
@@ -248,13 +248,13 @@ def handle_xmr_block(params):
         """, (block_height, reward, total_shares, current_time))
         
         # 3. 计算用户奖励
-        fee = Decimal(str(config['pool_fees']))
+        fee = config['pool_fees']
         
         # 4. 记录用户奖励
         for username, shares in user_shares.items():
             if shares > 0:
                 # 计算用户奖励比例
-                user_reward = value * Decimal(str(shares)) * (Decimal('1') - fee)
+                user_reward = value * shares * (1 - fee)
                 
                 # 检查是否已存在该用户的奖励记录
                 cur.execute("""
@@ -998,7 +998,7 @@ class TariBlockChecker(threading.Thread):
                 return
 
             # 更新区块状态
-            self.update_block_status(block[2], True, remote_hash)
+            self.update_block_status(block[], True, remote_hash)
             logger.info(f"区块 {block[1]} 验证成功")
 
         except Exception as e:
