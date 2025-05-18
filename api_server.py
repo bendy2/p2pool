@@ -282,7 +282,7 @@ def handle_xmr_block(params):
                     logger.info(f"用户 {username} 的 XMR 区块 {block_height} 奖励记录已存在，跳过")
         conn.commit()
         # 5. 清空Redis中的TARI提交记录
-        for key in redis_client.keys('tari:submit:*'):
+        for key in redis_client.keys('xmr:submit:*'):
             redis_client.delete(key)
             
         return {
