@@ -998,7 +998,7 @@ class TariBlockChecker(threading.Thread):
                 return
 
             # 更新区块状态
-            self.update_block_status(block[0], True, remote_hash)
+            self.update_block_status(block[2], True, remote_hash)
             logger.info(f"区块 {block[1]} 验证成功")
 
         except Exception as e:
