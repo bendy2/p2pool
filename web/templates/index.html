@@ -338,10 +338,18 @@
 
     // 初始化图表
     const hashrateChart = initHashrateChart();
+// 定期更新数据
+    setInterval(updateHashrateChart, 30000);  // 每30秒更新一次
+    setInterval(updateBlocks, 30000);  // 每30秒更新一次
+    updateHashrateChart();  // 立即更新一次
 
+    // 页面加载时立即更新一次
+    updateBlocks();
+    updatePoolStatus(); 
     // 定期更新数据
     setInterval(updateHashrateData, 30000);  // 每30秒更新一次
     updateHashrateData();  // 立即更新一次
+
 
     // 监听窗口大小变化，调整图表大小
     window.addEventListener('resize', function() {

@@ -218,10 +218,3 @@ function updateHashrateChart() {
         .catch(error => console.error('更新算力走势图失败:', error));
 }
 
-// 定期更新数据
-setInterval(updateHashrateChart, 30000);  // 每30秒更新一次
-updateHashrateChart();  // 立即更新一次
-
-// 页面加载时立即更新一次
-updateBlocks();
-updatePoolStatus(); 
