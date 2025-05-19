@@ -513,48 +513,97 @@
         myChart.setOption(option);
         return myChart;
     }
-
+    
     // 更新区块时间间隔数据
     function updateBlockIntervalData() {
-        fetch('/api/blocks/intervals')
+        const blocksList = document.getElementById('blocks-list');
+        if (!blocksList) return;
+
+        const xmrChart = echarts.getInstanceByDom(document.getElementById('xmrBlockIntervalChart'));
+        const tariChart = echarts.getInstanceByDom(document.getElementById('tariBlockIntervalChart'));
+        if (!xmrChart || !tariChart) return;
+
+        const rows = blocksList.getElementsByTagName('tr');
+        if (rows.length < 2) return;
+
+        const xmrData = [];
+        const tariData = [];
+
+        for (let i = 1; i < rows.length; i++) {
+            const currentRow = rows[i];
+            const prevRow = rows[i-1];
+            
+            const currentTime = new Date(currentRow.cells[0].textContent).getTime();
+            const prevTime = new Date(prevRow.cells[0].textContent).getTime();
+            const timeDiff = (currentTime - prevTime) / (1000 * 60); // 转换为分钟
+
+            // 根据区块类型分类
+            const blockType = currentRow.cells[3].textContent.trim();
+            const intervalData = [currentTime, timeDiff];
+
+            if (blockType === 'XMR') {
+                xmrData.push(intervalData);
+            } else if (blockType === 'TARI') {
+                tariData.push(intervalData);
+            }
+        }
+
+        // 更新XMR区块时间间隔图表
+        xmrChart.setOption({
+            series: [{
+                data: xmrData
+            }]
+        });
+
+        // 更新TARI区块时间间隔图表
+        tariChart.setOption({
+            series: [{
+                data: tariData
+            }]
+        });
+    }
+
+    // 修改updateBlocks函数，在数据更新后调用updateBlockIntervalData
+    function updateBlocks() {
+        fetch('/api/pool/blocks')
             .then(response => response.json())
             .then(data => {
-                const xmrChart = echarts.getInstanceByDom(document.getElementById('xmrBlockIntervalChart'));
-                const tariChart = echarts.getInstanceByDom(document.getElementById('tariBlockIntervalChart'));
-                
-                if (xmrChart) {
-                    xmrChart.setOption({
-                        series: [{
-                            data: data.xmr_intervals
-                        }]
+                const blocksList = document.getElementById('blocks-list');
+                if (blocksList) {
+                    blocksList.innerHTML = '';
+                    data.forEach(block => {
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td>${new Date(block.ts * 1000).toLocaleString('zh-CN')}</td>
+                            <td>${block.height}</td>
+                            <td>${block.hash}</td>
+                            <td>${block.type}</td>
+                            <td>${block.reward}</td>
+                            <td>${block.status}</td>
+                        `;
+                        blocksList.appendChild(row);
                     });
-                }
-                
-                if (tariChart) {
-                    tariChart.setOption({
-                        series: [{
-                            data: data.tari_intervals
-                        }]
-                    });
+                    // 在区块数据更新后更新区块时间间隔图表
+                    updateBlockIntervalData();
                 }
             })
-            .catch(error => console.error('获取区块间隔数据失败:', error));
+            .catch(error => console.error('获取区块数据失败:', error));
     }
 
     // 初始化图表
     const hashrateChart = initHashrateChart();
-// 定期更新数据
-    setInterval(updateHashrateChart, 30000);  // 每30秒更新一次
-    setInterval(updateBlocks, 30000);  // 每30秒更新一次
-    updateHashrateChart();  // 立即更新一次
+    const xmrBlockIntervalChart = initXmrBlockIntervalChart();
+    const tariBlockIntervalChart = initTariBlockIntervalChart();
+
+    // 定期更新数据
+    setInterval(updateBlocks, 30000);  // 每30秒更新一次区块数据
+    setInterval(updateHashrateData, 30000);  // 每30秒更新一次算力图表
+    setInterval(updatePoolStatus, 30000);  // 每30秒更新一次矿池状态
 
     // 页面加载时立即更新一次
     updateBlocks();
-    updatePoolStatus(); 
-    // 定期更新数据
-    setInterval(updateHashrateData, 30000);  // 每30秒更新一次
-    updateHashrateData();  // 立即更新一次
-
+    updateHashrateData();
+    updatePoolStatus();
 
     // 监听窗口大小变化，调整图表大小
     window.addEventListener('resize', function() {
