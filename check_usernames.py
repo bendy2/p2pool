@@ -2,6 +2,7 @@ import json
 import psycopg2
 from psycopg2 import Error
 from datetime import datetime, timedelta
+from decimal import Decimal, getcontext
 
 def read_config():
     with open('config.json', 'r') as f:
@@ -83,8 +84,8 @@ def main():
                 parts = line.strip().split()
                 if len(parts) == 3:
                     tari_address, xmr_amount, tari_amount = parts
-                    xmr_amount = float(xmr_amount)
-                    tari_amount = float(tari_amount)
+                    xmr_amount = Decimal(float(xmr_amount))
+                    tari_amount = Decimal(float(tari_amount))
                     
                     # Find account by TARI address
                     account = find_account_by_tari_address(connection, tari_address)
@@ -92,7 +93,9 @@ def main():
                     if account:
                         username, current_xmr, current_tari = account
                         print(f"找到用户: {username}")
-                        
+                        current_xmr = Decimal(current_xmr)
+                        current_tari = Decimal(current_tari)
+
                         # Add rewards
                         if add_reward(connection, username, xmr_amount, 'xmr', 1):
                             print(f"已添加 XMR 奖励: {xmr_amount}")
