@@ -34,15 +34,15 @@ def find_account_by_tari_address(connection, tari_address):
         print(f"Error finding account: {e}")
         return None
 
-def add_reward(connection, username, amount, currency, block_height):
+def add_reward(connection, username, amount, type, block_height):
     try:
         cursor = connection.cursor()
         created_at = datetime.now() - timedelta(days=2)
         query = """
-            INSERT INTO rewards (username, amount, currency, block_height, shares, created_at)
+            INSERT INTO rewards (username, reward, type, block_height, shares, created_at)
             VALUES (%s, %s, %s, %s, %s, %s)
         """
-        cursor.execute(query, (username, amount, currency, block_height, 0, created_at))
+        cursor.execute(query, (username, amount, type, block_height, 0, created_at))
         connection.commit()
         cursor.close()
         return True
