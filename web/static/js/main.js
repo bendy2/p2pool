@@ -151,6 +151,11 @@ function updateBlocks() {
                     }]
                 });
             }
+
+            // 在更新完区块列表后，调用updateBlockStats更新区块统计图表
+            if (typeof updateBlockStats === 'function') {
+                updateBlockStats();
+            }
         })
         .catch(error => console.error('获取区块数据失败:', error));
 }

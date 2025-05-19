@@ -375,14 +375,65 @@
         });
     }
 
-    // 初始化XMR区块时间间隔图表
+    // 更新区块统计图表
+    function updateBlockStats() {
+        const blocksList = document.getElementById('blocks-list');
+        if (!blocksList) return;
+
+        const xmrChart = echarts.getInstanceByDom(document.getElementById('xmrBlockIntervalChart'));
+        const tariChart = echarts.getInstanceByDom(document.getElementById('tariBlockIntervalChart'));
+        if (!xmrChart || !tariChart) return;
+
+        const rows = blocksList.getElementsByTagName('tr');
+        if (rows.length < 1) return;
+
+        // 按小时统计XMR和TARI区块数
+        const xmrStats = {};
+        const tariStats = {};
+
+        for (let i = 0; i < rows.length; i++) {
+            const row = rows[i];
+            const timeStr = row.cells[0].textContent;
+            const blockType = row.cells[3].textContent.trim();
+            
+            // 解析时间字符串为Date对象
+            const date = new Date(timeStr);
+            const hourKey = date.toLocaleString('zh-CN', {
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit'
+            });
+
+            if (blockType === 'XMR') {
+                xmrStats[hourKey] = (xmrStats[hourKey] || 0) + 1;
+            } else if (blockType === 'TARI') {
+                tariStats[hourKey] = (tariStats[hourKey] || 0) + 1;
+            }
+        }
+
+        // 更新XMR区块统计图表
+        xmrChart.setOption({
+            series: [{
+                data: Object.entries(xmrStats).map(([time, count]) => [time, count])
+            }]
+        });
+
+        // 更新TARI区块统计图表
+        tariChart.setOption({
+            series: [{
+                data: Object.entries(tariStats).map(([time, count]) => [time, count])
+            }]
+        });
+    }
+
+    // 初始化XMR区块统计图表
     function initXmrBlockIntervalChart() {
         const chartDom = document.getElementById('xmrBlockIntervalChart');
         const myChart = echarts.init(chartDom);
         
         const option = {
             title: {
-                text: 'XMR区块时间间隔',
+                text: 'XMR区块数/小时',
                 left: 'center',
                 top: 0,
                 textStyle: {
@@ -393,32 +444,24 @@
                 trigger: 'axis',
                 formatter: function(params) {
                     const data = params[0];
-                    return `时间: ${data.value[0]}<br/>间隔: ${data.value[1]}分钟`;
+                    return `时间: ${data.value[0]}<br/>区块数: ${data.value[1]}`;
                 }
             },
             xAxis: {
-                type: 'time',
+                type: 'category',
                 axisLabel: {
-                    formatter: function(value) {
-                        const date = new Date(value);
-                        return date.toLocaleString('zh-CN', {
-                            month: '2-digit',
-                            day: '2-digit',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                        });
-                    }
+                    rotate: 45
                 }
             },
             yAxis: {
                 type: 'value',
-                name: '时间间隔(分钟)',
+                name: '区块数',
                 nameTextStyle: {
                     padding: [0, 0, 0, 40]
                 }
             },
             series: [{
-                name: 'XMR区块间隔',
+                name: 'XMR区块数',
                 type: 'bar',
                 barWidth: '60%',
                 itemStyle: {
@@ -445,14 +488,14 @@
         return myChart;
     }
 
-    // 初始化TARI区块时间间隔图表
+    // 初始化TARI区块统计图表
     function initTariBlockIntervalChart() {
         const chartDom = document.getElementById('tariBlockIntervalChart');
         const myChart = echarts.init(chartDom);
         
         const option = {
             title: {
-                text: 'TARI区块时间间隔',
+                text: 'TARI区块数/小时',
                 left: 'center',
                 top: 0,
                 textStyle: {
@@ -463,32 +506,24 @@
                 trigger: 'axis',
                 formatter: function(params) {
                     const data = params[0];
-                    return `时间: ${data.value[0]}<br/>间隔: ${data.value[1]}分钟`;
+                    return `时间: ${data.value[0]}<br/>区块数: ${data.value[1]}`;
                 }
             },
             xAxis: {
-                type: 'time',
+                type: 'category',
                 axisLabel: {
-                    formatter: function(value) {
-                        const date = new Date(value);
-                        return date.toLocaleString('zh-CN', {
-                            month: '2-digit',
-                            day: '2-digit',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                        });
-                    }
+                    rotate: 45
                 }
             },
             yAxis: {
                 type: 'value',
-                name: '时间间隔(分钟)',
+                name: '区块数',
                 nameTextStyle: {
                     padding: [0, 0, 0, 40]
                 }
             },
             series: [{
-                name: 'TARI区块间隔',
+                name: 'TARI区块数',
                 type: 'bar',
                 barWidth: '60%',
                 itemStyle: {
@@ -514,55 +549,6 @@
         myChart.setOption(option);
         return myChart;
     }
-    
-    // 更新区块时间间隔数据
-    function updateBlockIntervalData() {
-        const blocksList = document.getElementById('blocks-list');
-        if (!blocksList) return;
-
-        const xmrChart = echarts.getInstanceByDom(document.getElementById('xmrBlockIntervalChart'));
-        const tariChart = echarts.getInstanceByDom(document.getElementById('tariBlockIntervalChart'));
-        if (!xmrChart || !tariChart) return;
-
-        const rows = blocksList.getElementsByTagName('tr');
-        if (rows.length < 2) return;
-
-        const xmrData = [];
-        const tariData = [];
-
-        for (let i = 1; i < rows.length; i++) {
-            const currentRow = rows[i];
-            const prevRow = rows[i-1];
-            
-            const currentTime = new Date(currentRow.cells[0].textContent).getTime();
-            const prevTime = new Date(prevRow.cells[0].textContent).getTime();
-            const timeDiff = (currentTime - prevTime) / (1000 * 60); // 转换为分钟
-
-            // 根据区块类型分类
-            const blockType = currentRow.cells[3].textContent.trim();
-            const intervalData = [currentTime, timeDiff];
-
-            if (blockType === 'XMR') {
-                xmrData.push(intervalData);
-            } else if (blockType === 'TARI') {
-                tariData.push(intervalData);
-            }
-        }
-
-        // 更新XMR区块时间间隔图表
-        xmrChart.setOption({
-            series: [{
-                data: xmrData
-            }]
-        });
-
-        // 更新TARI区块时间间隔图表
-        tariChart.setOption({
-            series: [{
-                data: tariData
-            }]
-        });
-    }
 
     // 初始化图表
     const hashrateChart = initHashrateChart();
@@ -573,11 +559,13 @@
     setInterval(updateBlocks, 30000);  // 每30秒更新一次区块数据
     setInterval(updateHashrateData, 30000);  // 每30秒更新一次算力图表
     setInterval(updatePoolStatus, 30000);  // 每30秒更新一次矿池状态
+    setInterval(updateBlockStats, 30000);  // 每30秒更新一次区块统计
 
     // 页面加载时立即更新一次
     updateBlocks();
     updateHashrateData();
     updatePoolStatus();
+    updateBlockStats();
 
     // 监听窗口大小变化，调整图表大小
     window.addEventListener('resize', function() {
