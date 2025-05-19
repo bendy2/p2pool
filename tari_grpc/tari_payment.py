@@ -271,7 +271,7 @@ class TariPayment:
                 FROM rewards 
                 WHERE type = 'tari' 
                 AND username = %s
-                AND time >= %s
+                AND created_at >= %s
             ''', (user_id, time_threshold))
             recent_rewards = self.cursor.fetchone()[0]
 
