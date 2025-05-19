@@ -423,7 +423,7 @@ def get_blocks():
                    block_id, is_valid, check_status
             FROM blocks
             ORDER BY time DESC
-            LIMIT 100
+            LIMIT 1000
         """)
         blocks = cursor.fetchall()
         cursor.close()
