@@ -556,16 +556,15 @@
     const tariBlockIntervalChart = initTariBlockIntervalChart();
 
     // 定期更新数据
-    setInterval(updateBlocks, 30000);  // 每30秒更新一次区块数据
-    setInterval(updateHashrateData, 30000);  // 每30秒更新一次算力图表
-    setInterval(updatePoolStatus, 30000);  // 每30秒更新一次矿池状态
+
     setInterval(updateBlockStats, 30000);  // 每30秒更新一次区块统计
 
     // 页面加载时立即更新一次
-    updateBlocks();
-    updateHashrateData();
-    updatePoolStatus();
+
     updateBlockStats();
+
+
+
 
     // 监听窗口大小变化，调整图表大小
     window.addEventListener('resize', function() {
