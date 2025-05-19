@@ -390,6 +390,7 @@
         // 按小时统计XMR和TARI区块数
         const xmrStats = {};
         const tariStats = {};
+        let earliestTime = null;
 
         for (let i = 0; i < rows.length; i++) {
             const row = rows[i];
@@ -398,6 +399,10 @@
             
             // 解析时间字符串为Date对象
             const date = new Date(timeStr);
+            if (!earliestTime || date < earliestTime) {
+                earliestTime = date;
+            }
+            
             const hourKey = date.toLocaleString('zh-CN', {
                 month: '2-digit',
                 day: '2-digit',
@@ -411,17 +416,38 @@
             }
         }
 
+        // 生成时间范围
+        const timeRange = [];
+        const endTime = new Date();
+        let currentTime = earliestTime;
+        
+        while (currentTime <= endTime) {
+            const hourKey = currentTime.toLocaleString('zh-CN', {
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit'
+            });
+            timeRange.push(hourKey);
+            currentTime.setHours(currentTime.getHours() + 1);
+        }
+
         // 更新XMR区块统计图表
         xmrChart.setOption({
+            xAxis: {
+                data: timeRange
+            },
             series: [{
-                data: Object.entries(xmrStats).map(([time, count]) => [time, count])
+                data: timeRange.map(time => [time, xmrStats[time] || 0])
             }]
         });
 
         // 更新TARI区块统计图表
         tariChart.setOption({
+            xAxis: {
+                data: timeRange
+            },
             series: [{
-                data: Object.entries(tariStats).map(([time, count]) => [time, count])
+                data: timeRange.map(time => [time, tariStats[time] || 0])
             }]
         });
     }
