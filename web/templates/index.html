@@ -563,33 +563,6 @@
         });
     }
 
-    // 修改updateBlocks函数，在数据更新后调用updateBlockIntervalData
-    function updateBlocks() {
-        fetch('/api/pool/blocks')
-            .then(response => response.json())
-            .then(data => {
-                const blocksList = document.getElementById('blocks-list');
-                if (blocksList) {
-                    blocksList.innerHTML = '';
-                    data.forEach(block => {
-                        const row = document.createElement('tr');
-                        row.innerHTML = `
-                            <td>${new Date(block.ts * 1000).toLocaleString('zh-CN')}</td>
-                            <td>${block.height}</td>
-                            <td>${block.hash}</td>
-                            <td>${block.type}</td>
-                            <td>${block.reward}</td>
-                            <td>${block.status}</td>
-                        `;
-                        blocksList.appendChild(row);
-                    });
-                    // 在区块数据更新后更新区块时间间隔图表
-                    updateBlockIntervalData();
-                }
-            })
-            .catch(error => console.error('获取区块数据失败:', error));
-    }
-
     // 初始化图表
     const hashrateChart = initHashrateChart();
     const xmrBlockIntervalChart = initXmrBlockIntervalChart();

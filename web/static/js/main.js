@@ -63,7 +63,11 @@ function updateBlocks() {
             const blocksList = document.getElementById('blocks-list');
             blocksList.innerHTML = '';
             
-            data.forEach(block => {
+            // 用于存储XMR和TARI区块的时间间隔数据
+            const xmrIntervals = [];
+            const tariIntervals = [];
+            
+            data.forEach((block, index) => {
                 const row = document.createElement('tr');
                 const blockType = block.type.toLowerCase();
                 row.className = blockType === 'xmr' ? 'block-xmr' : 'block-tari';
@@ -80,6 +84,20 @@ function updateBlocks() {
                     second: '2-digit',
                     hour12: false
                 });
+                
+                // 计算区块时间间隔
+                if (index > 0) {
+                    const prevBlock = data[index - 1];
+                    const prevTime = new Date(prevBlock.timestamp);
+                    const timeDiff = (time - prevTime) / (1000 * 60); // 转换为分钟
+                    
+                    const intervalData = [beijingTime.getTime(), timeDiff];
+                    if (blockType === 'xmr') {
+                        xmrIntervals.push(intervalData);
+                    } else {
+                        tariIntervals.push(intervalData);
+                    }
+                }
                 
                 const typeClass = blockType === 'xmr' ? 'block-type-xmr' : 'block-type-tari';
                 
@@ -113,6 +131,26 @@ function updateBlocks() {
                 
                 blocksList.appendChild(row);
             });
+
+            // 更新区块时间间隔图表
+            const xmrChart = echarts.getInstanceByDom(document.getElementById('xmrBlockIntervalChart'));
+            const tariChart = echarts.getInstanceByDom(document.getElementById('tariBlockIntervalChart'));
+            
+            if (xmrChart) {
+                xmrChart.setOption({
+                    series: [{
+                        data: xmrIntervals
+                    }]
+                });
+            }
+            
+            if (tariChart) {
+                tariChart.setOption({
+                    series: [{
+                        data: tariIntervals
+                    }]
+                });
+            }
         })
         .catch(error => console.error('获取区块数据失败:', error));
 }
