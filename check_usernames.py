@@ -23,8 +23,9 @@ def connect_to_db(db_config):
 
 def check_username(connection, username):
     try:
+        username ="%"+username
         cursor = connection.cursor()
-        query = "SELECT username FROM ACCOUNT WHERE username like '%%s'"
+        query = "SELECT username FROM ACCOUNT WHERE username like '%s'"
         cursor.execute(query, (username,))
         result = cursor.fetchone()
         cursor.close()
