@@ -26,6 +26,129 @@ app = Flask(__name__)
 # Redis连接配置
 redis_client = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
 
+# 缓存键名常量
+CACHE_KEYS = {
+    'POOL_STATS': 'cached:pool_stats',
+    'ACTIVE_MINERS': 'cached:active_miners',
+    'STRATUM_DATA': 'cached:stratum_data',
+    'ONLINE_MINERS': 'cached:online_miners'
+}
+
+# 缓存过期时间（秒）
+CACHE_EXPIRE = {
+    'POOL_STATS': 30,      # 矿池状态缓存30秒
+    'ACTIVE_MINERS': 10,   # 活跃矿工数缓存10秒
+    'STRATUM_DATA': 5,     # stratum数据缓存5秒
+    'ONLINE_MINERS': 10    # 在线矿工列表缓存10秒
+}
+
+def get_cached_data(key, calculate_func, expire_time):
+    """获取缓存数据，如果不存在则计算并缓存"""
+    cached_data = redis_client.get(key)
+    if cached_data:
+        return json.loads(cached_data)
+    
+    data = calculate_func()
+    redis_client.setex(key, expire_time, json.dumps(data))
+    return data
+
+def calculate_pool_stats():
+    """计算矿池统计数据"""
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor(cursor_factory=DictCursor)
+        
+        # 使用单个查询获取所有统计数据
+        cur.execute("""
+            SELECT 
+                SUM(CASE WHEN type = 'xmr' AND is_valid = TRUE THEN rewards ELSE 0 END) as total_rewards_xmr,
+                SUM(CASE WHEN type = 'tari' AND is_valid = TRUE THEN rewards ELSE 0 END) as total_rewards_tari,
+                (SELECT COALESCE(SUM(amount), 0) FROM payment WHERE type = 'xmr') as total_paid_xmr,
+                (SELECT COALESCE(SUM(amount), 0) FROM payment WHERE type = 'tari' AND status = 'completed') as total_paid_tari
+            FROM blocks
+        """)
+        stats = cur.fetchone()
+        
+        cur.close()
+        conn.close()
+        
+        return {
+            'total_rewards_xmr': float(stats['total_rewards_xmr'] or 0),
+            'total_rewards_tari': float(stats['total_rewards_tari'] or 0),
+            'total_paid_xmr': float(stats['total_paid_xmr'] or 0),
+            'total_paid_tari': float(stats['total_paid_tari'] or 0)
+        }
+    except Exception as e:
+        logger.error(f"计算矿池统计数据失败: {str(e)}")
+        return {
+            'total_rewards_xmr': 0,
+            'total_rewards_tari': 0,
+            'total_paid_xmr': 0,
+            'total_paid_tari': 0
+        }
+
+def get_cached_stratum_data():
+    """获取缓存的stratum数据"""
+    return get_cached_data(
+        CACHE_KEYS['STRATUM_DATA'],
+        read_stratum_data,
+        CACHE_EXPIRE['STRATUM_DATA']
+    )
+
+def get_cached_active_miners():
+    """获取缓存的活跃矿工数"""
+    return get_cached_data(
+        CACHE_KEYS['ACTIVE_MINERS'],
+        lambda: len(set(worker.split(',')[4] for worker in get_cached_stratum_data()['workers'] if len(worker.split(',')) >= 5)),
+        CACHE_EXPIRE['ACTIVE_MINERS']
+    )
+
+def get_cached_online_miners():
+    """获取缓存的在线矿工列表"""
+    def calculate_online_miners():
+        stratum_data = get_cached_stratum_data()
+        miner_hashrates = {}
+        
+        # 收集所有矿工数据
+        for worker in stratum_data['workers']:
+            try:
+                parts = worker.split(',')
+                if len(parts) >= 5:
+                    username = parts[4]
+                    hashrate = float(parts[3])
+                    miner_hashrates[username] = miner_hashrates.get(username, 0) + hashrate
+            except:
+                continue
+        
+        # 批量获取Redis数据
+        pipe = redis_client.pipeline()
+        for username in miner_hashrates:
+            pipe.get(get_chain_key(username, 'xmr'))
+            pipe.get(get_chain_key(username, 'tari'))
+        redis_results = pipe.execute()
+        
+        # 处理结果
+        online_miners = []
+        for i, (username, hashrate) in enumerate(miner_hashrates.items()):
+            xmr_count = int(redis_results[i*2] or 0)
+            tari_count = int(redis_results[i*2+1] or 0)
+            online_miners.append({
+                'username': format_username(username),
+                'hashrate': hashrate,
+                'xmr_share': xmr_count,
+                'tari_share': tari_count
+            })
+        
+        # 按算力排序并只取前20名
+        online_miners.sort(key=lambda x: x['xmr_share'], reverse=True)
+        return online_miners[:20]
+    
+    return get_cached_data(
+        CACHE_KEYS['ONLINE_MINERS'],
+        calculate_online_miners,
+        CACHE_EXPIRE['ONLINE_MINERS']
+    )
+
 # 加载配置文件
 def load_config():
     try:
@@ -150,94 +273,25 @@ def format_username(username):
 @app.route('/api/pool_status')
 def pool_status():
     try:
-        # 获取活跃矿工数（带缓存）
-        active_miners = get_active_miners()
-
-        # 从数据库获取总奖励
-        conn = get_db_connection()
-        cur = conn.cursor(cursor_factory=DictCursor)
-        
-        # 获取XMR总奖励
-        cur.execute("""
-            SELECT COALESCE(SUM(rewards), 0) as total
-            FROM blocks 
-            WHERE type = 'xmr' AND is_valid = TRUE
-        """)
-        total_rewards_xmr = float(cur.fetchone()['total'] or 0)
-
-        # 获取TARI总奖励
-        cur.execute("""
-            SELECT COALESCE(SUM(rewards), 0) as total
-            FROM blocks 
-            WHERE type = 'tari' AND is_valid = TRUE
-        """)
-        total_rewards_tari = float(cur.fetchone()['total'] or 0)
-            # 获取XMR已支付金额
-        cur.execute("""
-            SELECT COALESCE(SUM(amount), 0) as total_paid
-            FROM payment 
-            WHERE type = 'xmr'
-        """)
-        total_paid_xmr = float(cur.fetchone()[0] or 0)
-        # 获取TARI已支付金额
-        cur.execute("""
-            SELECT COALESCE(SUM(amount), 0) as total_paid
-            FROM payment 
-            WHERE type = 'tari' and status = 'completed'
-        """)
-        total_paid_tari = float(cur.fetchone()[0] or 0)
-
-        cur.close()
-        conn.close()
-
-        # 从stratum文件读取算力数据
-        stratum_data = read_stratum_data()
-        
-        # 获取在线矿工列表
-        online_miners = []
-        miner_hashrates = {}  # 用于合并同一用户的算力
-        
-        for worker in stratum_data['workers']:
-            try:
-                parts = worker.split(',')
-                if len(parts) >= 5:
-                    username = parts[4]
-                    hashrate = float(parts[3])
-                    
-                    # 合并同一用户的算力
-                    if username in miner_hashrates:
-                        miner_hashrates[username] += hashrate
-                    else:
-                        miner_hashrates[username] = hashrate
-            except:
-                continue
-        
-        # 转换为列表并格式化用户名
-        for username, hashrate in miner_hashrates.items():
-            xmr_key = get_chain_key(username, 'xmr')
-            tari_key = get_chain_key(username, 'tari')
-            xmr_count = int(redis_client.get(xmr_key) or 0)
-            tari_count = int(redis_client.get(tari_key) or 0)
-            online_miners.append({
-                'username': format_username(username),
-                'hashrate': hashrate,
-                'xmr_share': xmr_count,
-                'tari_share': tari_count
-            })
-        
-        # 按算力排序并只取前20名
-        online_miners.sort(key=lambda x: x['xmr_share'], reverse=True)
-        online_miners = online_miners[:20]
+        # 获取所有缓存数据
+        pool_stats = get_cached_data(
+            CACHE_KEYS['POOL_STATS'],
+            calculate_pool_stats,
+            CACHE_EXPIRE['POOL_STATS']
+        )
+        stratum_data = get_cached_stratum_data()
+        active_miners = get_cached_active_miners()
+        online_miners = get_cached_online_miners()
 
         return jsonify({
             'hashrate_15m': stratum_data['hashrate_15m'],
             'hashrate_1h': stratum_data['hashrate_1h'],
             'hashrate_24h': stratum_data['hashrate_24h'],
             'active_miners': active_miners,
-            'total_rewards_xmr': total_rewards_xmr,
-            'total_rewards_tari': total_rewards_tari,
-            'total_paid_xmr': total_paid_xmr,
-            'total_paid_tari': total_paid_tari,
+            'total_rewards_xmr': pool_stats['total_rewards_xmr'],
+            'total_rewards_tari': pool_stats['total_rewards_tari'],
+            'total_paid_xmr': pool_stats['total_paid_xmr'],
+            'total_paid_tari': pool_stats['total_paid_tari'],
             'online_miners': online_miners
         })
     except Exception as e:
