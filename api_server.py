@@ -1028,7 +1028,7 @@ class TariBlockChecker(threading.Thread):
                 UPDATE blocks 
                 SET check_status = true, 
                     is_valid = false
-                WHERE id = %s
+                WHERE block_id = %s
             """, (block_id,))
             
             # 2. 获取该区块的所有奖励记录
@@ -1058,7 +1058,7 @@ class TariBlockChecker(threading.Thread):
             # 4. 删除奖励记录
             cur.execute("""
                 UPDATE rewards 
-                        set reward = 0 ,is_valid = false,check_status = true
+                        set reward = 0
                 WHERE block_height = %s
             """, (block_height,))
             
