@@ -1,8 +1,8 @@
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel
+from fastapi.middleware.cors import CORSMiddleware
 import redis
 import psycopg2
 from psycopg2.extras import DictCursor
@@ -10,9 +10,10 @@ from datetime import datetime
 import json
 import os
 import logging
-import asyncio
-import web
-from typing import List, Optional, Dict, Any
+import threading
+import time
+from typing import Optional, List, Dict, Any
+from pydantic import BaseModel
 
 # 配置日志
 logging.basicConfig(
@@ -26,47 +27,51 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Tari-Cpu TPOOL")
+app = FastAPI(title="Tari-Cpu TPOOL分享池")
+
+# 配置CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # 挂载静态文件
-app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/static", StaticFiles(directory="web/static"), name="static")
 
 # 配置模板
-templates = Jinja2Templates(directory="templates")
+templates = Jinja2Templates(directory="web/templates")
 
 # Redis连接配置
 redis_client = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
 
-# 加载配置文件
-def load_config():
-    try:
-        with open('../config.json', 'r') as f:
-            return json.load(f)
-    except Exception as e:
-        logger.error(f"加载配置文件失败: {str(e)}")
-        raise
+# 缓存键名常量
+CACHE_KEYS = {
+    'POOL_STATS': 'cached:pool_stats',
+    'ACTIVE_MINERS': 'cached:active_miners',
+    'STRATUM_DATA': 'cached:stratum_data',
+    'ONLINE_MINERS': 'cached:online_miners'
+}
 
-config = load_config()
+# 缓存过期时间（秒）
+CACHE_EXPIRE = {
+    'POOL_STATS': 30,      # 矿池状态缓存30秒
+    'ACTIVE_MINERS': 10,   # 活跃矿工数缓存10秒
+    'STRATUM_DATA': 5,     # stratum数据缓存5秒
+    'ONLINE_MINERS': 10    # 在线矿工列表缓存10秒
+}
 
-# 数据库连接配置
-def get_db_connection():
-    return psycopg2.connect(
-        host=config['database']['host'],
-        port=config['database']['port'],
-        database=config['database']['database'],
-        user=config['database']['user'],
-        password=config['database']['password']
-    )
-
-# 数据模型
+# Pydantic模型
 class Block(BaseModel):
+    timestamp: str
     height: int
-    timestamp: int
     type: str
-    reward: float
-    status: str
-    block_id: Optional[str] = None
-    is_valid: Optional[bool] = None
+    reward: str
+    block_id: str
+    is_valid: bool
+    check_status: bool
 
 class Miner(BaseModel):
     username: str
@@ -85,36 +90,122 @@ class PoolStatus(BaseModel):
     total_paid_tari: float
     online_miners: List[Miner]
 
-# 工具函数
-async def read_stratum_data():
+class UserInfo(BaseModel):
+    username: str
+    xmr_balance: float
+    tari_balance: float
+    xmr_payed: float
+    tari_payed: float
+    created_at: str
+    current_hashrate: float
+    xmr_wallet: str
+    tari_wallet: str
+    fee: float
+    frozen_tari: float
+    rewards: List[Dict[str, Any]]
+    payments: List[Dict[str, Any]]
+
+def get_cached_data(key: str, calculate_func, expire_time: int) -> Any:
+    """获取缓存数据，如果不存在则计算并缓存"""
+    cached_data = redis_client.get(key)
+    if cached_data:
+        return json.loads(cached_data)
+    
+    data = calculate_func()
+    redis_client.setex(key, expire_time, json.dumps(data))
+    return data
+
+def calculate_pool_stats() -> Dict[str, float]:
+    """计算矿池统计数据"""
     try:
-        with open('./api/local/stratum', 'r') as f:
-            data = json.load(f)
-            return {
-                'hashrate_15m': data.get('hashrate_15m', 0),
-                'hashrate_1h': data.get('hashrate_1h', 0),
-                'hashrate_24h': data.get('hashrate_24h', 0),
-                'workers': data.get('workers', [])
-            }
+        conn = get_db_connection()
+        cur = conn.cursor(cursor_factory=DictCursor)
+        
+        cur.execute("""
+            SELECT 
+                SUM(CASE WHEN type = 'xmr' AND is_valid = TRUE THEN rewards ELSE 0 END) as total_rewards_xmr,
+                SUM(CASE WHEN type = 'tari' AND is_valid = TRUE THEN rewards ELSE 0 END) as total_rewards_tari,
+                (SELECT COALESCE(SUM(amount), 0) FROM payment WHERE type = 'xmr') as total_paid_xmr,
+                (SELECT COALESCE(SUM(amount), 0) FROM payment WHERE type = 'tari' AND status = 'completed') as total_paid_tari
+            FROM blocks
+        """)
+        stats = cur.fetchone()
+        
+        cur.close()
+        conn.close()
+        
+        return {
+            'total_rewards_xmr': float(stats['total_rewards_xmr'] or 0),
+            'total_rewards_tari': float(stats['total_rewards_tari'] or 0),
+            'total_paid_xmr': float(stats['total_paid_xmr'] or 0),
+            'total_paid_tari': float(stats['total_paid_tari'] or 0)
+        }
     except Exception as e:
-        logger.error(f"读取stratum数据失败: {str(e)}")
-        return None
+        logger.error(f"计算矿池统计数据失败: {str(e)}")
+        return {
+            'total_rewards_xmr': 0,
+            'total_rewards_tari': 0,
+            'total_paid_xmr': 0,
+            'total_paid_tari': 0
+        }
 
-def get_chain_key(username: str, chain: str) -> str:
-    xmr_prefix = "xmr:submit:"
-    tari_prefix = "tari:submit:"
-    if chain.lower() == 'xmr':
-        return f"{xmr_prefix}{username}"
-    else:
-        return f"{tari_prefix}{username}"
+def get_cached_stratum_data() -> Dict[str, Any]:
+    """获取缓存的stratum数据"""
+    return get_cached_data(
+        CACHE_KEYS['STRATUM_DATA'],
+        read_stratum_data,
+        CACHE_EXPIRE['STRATUM_DATA']
+    )
 
-def format_username(username: str) -> str:
-    if len(username) <= 20:
-        prefix = username[:4].ljust(4, '*')
-        return f"{prefix}****"
-    else:
-        suffix = username[-4:]
-        return f"****{suffix}"
+def get_cached_active_miners() -> int:
+    """获取缓存的活跃矿工数"""
+    return get_cached_data(
+        CACHE_KEYS['ACTIVE_MINERS'],
+        lambda: len(set(worker.split(',')[4] for worker in get_cached_stratum_data()['workers'] if len(worker.split(',')) >= 5)),
+        CACHE_EXPIRE['ACTIVE_MINERS']
+    )
+
+def get_cached_online_miners() -> List[Miner]:
+    """获取缓存的在线矿工列表"""
+    def calculate_online_miners():
+        stratum_data = get_cached_stratum_data()
+        miner_hashrates = {}
+        
+        for worker in stratum_data['workers']:
+            try:
+                parts = worker.split(',')
+                if len(parts) >= 5:
+                    username = parts[4]
+                    hashrate = float(parts[3])
+                    miner_hashrates[username] = miner_hashrates.get(username, 0) + hashrate
+            except:
+                continue
+        
+        pipe = redis_client.pipeline()
+        for username in miner_hashrates:
+            pipe.get(get_chain_key(username, 'xmr'))
+            pipe.get(get_chain_key(username, 'tari'))
+        redis_results = pipe.execute()
+        
+        online_miners = []
+        for i, (username, hashrate) in enumerate(miner_hashrates.items()):
+            xmr_count = int(redis_results[i*2] or 0)
+            tari_count = int(redis_results[i*2+1] or 0)
+            online_miners.append(Miner(
+                username=format_username(username),
+                hashrate=hashrate,
+                xmr_share=xmr_count,
+                tari_share=tari_count
+            ))
+        
+        online_miners.sort(key=lambda x: x.xmr_share, reverse=True)
+        return online_miners[:20]
+    
+    return get_cached_data(
+        CACHE_KEYS['ONLINE_MINERS'],
+        calculate_online_miners,
+        CACHE_EXPIRE['ONLINE_MINERS']
+    )
 
 # 路由处理
 @app.get("/", response_class=HTMLResponse)
@@ -124,8 +215,8 @@ async def index(request: Request):
 @app.get("/u/")
 async def user_search(username: Optional[str] = None):
     if username:
-        return RedirectResponse(url=f"/u/{username}")
-    return RedirectResponse(url="/")
+        return {"redirect": f"/u/{username}"}
+    return {"redirect": "/"}
 
 @app.get("/u/{username}", response_class=HTMLResponse)
 async def user_page(request: Request, username: str):
@@ -136,157 +227,251 @@ async def user_page(request: Request, username: str):
 @app.get("/api/pool_status", response_model=PoolStatus)
 async def pool_status():
     try:
-        # 获取活跃矿工数
-        active_miners = await get_active_miners()
-
-        # 从数据库获取总奖励
-        conn = get_db_connection()
-        cur = conn.cursor(cursor_factory=DictCursor)
-        
-        # 获取XMR总奖励
-        cur.execute("""
-            SELECT COALESCE(SUM(rewards), 0) as total
-            FROM blocks 
-            WHERE type = 'xmr' AND is_valid = TRUE
-        """)
-        total_rewards_xmr = float(cur.fetchone()['total'] or 0)
-
-        # 获取TARI总奖励
-        cur.execute("""
-            SELECT COALESCE(SUM(rewards), 0) as total
-            FROM blocks 
-            WHERE type = 'tari' AND is_valid = TRUE
-        """)
-        total_rewards_tari = float(cur.fetchone()['total'] or 0)
-
-        # 获取XMR已支付金额
-        cur.execute("""
-            SELECT COALESCE(SUM(amount), 0) as total_paid
-            FROM payment 
-            WHERE type = 'xmr'
-        """)
-        total_paid_xmr = float(cur.fetchone()[0] or 0)
-
-        # 获取TARI已支付金额
-        cur.execute("""
-            SELECT COALESCE(SUM(amount), 0) as total_paid
-            FROM payment 
-            WHERE type = 'tari' and status = 'completed'
-        """)
-        total_paid_tari = float(cur.fetchone()[0] or 0)
-
-        cur.close()
-        conn.close()
-
-        # 从stratum文件读取算力数据
-        stratum_data = await read_stratum_data()
-        
-        # 获取在线矿工列表
-        online_miners = []
-        miner_hashrates = {}
-        
-        for worker in stratum_data['workers']:
-            try:
-                parts = worker.split(',')
-                if len(parts) >= 5:
-                    username = parts[4]
-                    hashrate = float(parts[3])
-                    
-                    if username in miner_hashrates:
-                        miner_hashrates[username] += hashrate
-                    else:
-                        miner_hashrates[username] = hashrate
-            except:
-                continue
-        
-        for username, hashrate in miner_hashrates.items():
-            xmr_key = get_chain_key(username, 'xmr')
-            tari_key = get_chain_key(username, 'tari')
-            xmr_count = int(redis_client.get(xmr_key) or 0)
-            tari_count = int(redis_client.get(tari_key) or 0)
-            online_miners.append(Miner(
-                username=format_username(username),
-                hashrate=hashrate,
-                xmr_share=xmr_count,
-                tari_share=tari_count
-            ))
-        
-        online_miners.sort(key=lambda x: x.xmr_share, reverse=True)
-        online_miners = online_miners[:20]
+        pool_stats = get_cached_data(
+            CACHE_KEYS['POOL_STATS'],
+            calculate_pool_stats,
+            CACHE_EXPIRE['POOL_STATS']
+        )
+        stratum_data = get_cached_stratum_data()
+        active_miners = get_cached_active_miners()
+        online_miners = get_cached_online_miners()
 
         return PoolStatus(
             hashrate_15m=stratum_data['hashrate_15m'],
             hashrate_1h=stratum_data['hashrate_1h'],
             hashrate_24h=stratum_data['hashrate_24h'],
             active_miners=active_miners,
-            total_rewards_xmr=total_rewards_xmr,
-            total_rewards_tari=total_rewards_tari,
-            total_paid_xmr=total_paid_xmr,
-            total_paid_tari=total_paid_tari,
+            total_rewards_xmr=pool_stats['total_rewards_xmr'],
+            total_rewards_tari=pool_stats['total_rewards_tari'],
+            total_paid_xmr=pool_stats['total_paid_xmr'],
+            total_paid_tari=pool_stats['total_paid_tari'],
             online_miners=online_miners
         )
     except Exception as e:
         logger.error(f"获取矿池状态失败: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/api/user/{username}", response_model=UserInfo)
+async def user_info(username: str):
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor(cursor_factory=DictCursor)
+        
+        cur.execute("""
+            SELECT username, xmr_balance, tari_balance, created_at, xmr_wallet, tari_wallet, fee
+            FROM account 
+            WHERE username = %s
+        """, (username,))
+        account = cur.fetchone()
+        
+        if not account:
+            raise HTTPException(status_code=404, detail="用户不存在")
+        
+        # 计算18小时内的TARI冻结金额
+        cur.execute("""
+            SELECT COALESCE(SUM(reward), 0) as frozen_tari
+            FROM rewards 
+            WHERE username = %s 
+            AND type = 'tari'
+            AND created_at >= NOW() - INTERVAL '18 hours'
+        """, (username,))
+        frozen_result = cur.fetchone()
+        frozen_tari = float(frozen_result['frozen_tari']) if frozen_result else 0
+
+        # 计算已支付的TARI
+        cur.execute("""
+            SELECT COALESCE(SUM(amount), 0) as tari_payed
+            FROM payment 
+            WHERE username = %s 
+            AND type = 'tari'
+            AND status = 'completed'
+        """, (username,))   
+        tari_payed_result = cur.fetchone()
+        tari_payed = float(tari_payed_result['tari_payed']) if tari_payed_result else 0
+
+        # 计算已支付的XMR
+        cur.execute("""
+            SELECT COALESCE(SUM(amount), 0) as xmr_payed
+            FROM payment 
+            WHERE username = %s 
+            AND type = 'xmr'
+        """, (username,))
+        xmr_payed_result = cur.fetchone()
+        xmr_payed = float(xmr_payed_result['xmr_payed']) if xmr_payed_result else 0
+
+        # 获取用户奖励历史
+        cur.execute("""
+            SELECT 
+                r.block_height as height,
+                r.type,
+                r.reward as amount,
+                r.shares,
+                b.time as timestamp,
+                b.total_shares
+            FROM rewards r
+            JOIN blocks b ON r.block_height = b.block_height
+            WHERE r.username = %s 
+            ORDER BY b.time DESC 
+            LIMIT 50
+        """, (username,))
+        rewards = []
+        for row in cur.fetchall():
+            reward = dict(row)
+            reward['amount'] = float(reward['amount'])
+            reward['shares'] = float(reward['shares'])
+            reward['total_shares'] = float(reward['total_shares'])
+            rewards.append(reward)
+        
+        # 获取用户支付历史
+        cur.execute("""
+            SELECT 
+                time as timestamp,
+                txid,
+                amount,
+                type
+            FROM payment 
+            WHERE username = %s 
+            ORDER BY time DESC 
+            LIMIT 20
+        """, (username,))
+        payments = []
+        for row in cur.fetchall():
+            payment = dict(row)
+            payment['amount'] = float(payment['amount'])
+            payments.append(payment)
+        
+        # 获取用户当前算力
+        current_hashrate = get_user_hashrate(username)
+
+        cur.close()
+        conn.close()
+        
+        return UserInfo(
+            username=username,
+            xmr_balance=float(account['xmr_balance']),
+            tari_balance=float(account['tari_balance'])-frozen_tari,
+            xmr_payed=xmr_payed,
+            tari_payed=tari_payed,
+            created_at=account['created_at'].isoformat(),
+            current_hashrate=current_hashrate,
+            xmr_wallet=account['xmr_wallet'],
+            tari_wallet=account['tari_wallet'],
+            fee=float(account['fee']),
+            frozen_tari=frozen_tari,
+            rewards=rewards,
+            payments=payments
+        )
+    except Exception as e:
+        logger.error(f"获取用户信息失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/api/blocks", response_model=List[Block])
 async def get_blocks():
     try:
         conn = get_db_connection()
-        cur = conn.cursor(cursor_factory=DictCursor)
-        
-        cur.execute("""
-            SELECT height, timestamp, type, rewards, block_id, is_valid
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT time as timestamp, block_height as height, type, rewards as reward, 
+                   block_id, is_valid, check_status
             FROM blocks
-            ORDER BY timestamp DESC
-            LIMIT 50
+            ORDER BY time DESC
+            LIMIT 100
         """)
-        
-        blocks = []
-        for row in cur.fetchall():
-            blocks.append(Block(
-                height=row['height'],
-                timestamp=row['timestamp'],
-                type=row['type'],
-                reward=float(row['rewards']),
-                status='有效' if row['is_valid'] else '无效',
-                block_id=row['block_id'],
-                is_valid=row['is_valid']
-            ))
-        
-        cur.close()
+        blocks = cursor.fetchall()
+        cursor.close()
         conn.close()
-        
-        return blocks
+
+        formatted_blocks = []
+        for block in blocks:
+            timestamp, height, block_type, reward, block_id, is_valid, check_status = block
+            
+            if timestamp:
+                timestamp = timestamp.strftime('%Y-%m-%d %H:%M:%S')
+            
+            if block_type == 'xmr':
+                reward = f"{float(reward):.6f} XMR"
+            else:  # TARI
+                reward = f"{float(reward):.2f} XTM"
+            
+            formatted_blocks.append(Block(
+                timestamp=timestamp,
+                height=height,
+                type=block_type,
+                reward=reward,
+                block_id=block_id,
+                is_valid=is_valid,
+                check_status=check_status
+            ))
+
+        return formatted_blocks
     except Exception as e:
-        logger.error(f"获取区块数据失败: {str(e)}")
+        logger.error(f"获取区块列表失败: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/hashrate/history")
-async def get_hashrate_history():
+async def get_hashrate_history(hours: int = 24):
     try:
         conn = get_db_connection()
-        cur = conn.cursor(cursor_factory=DictCursor)
+        cursor = conn.cursor()
         
-        cur.execute("""
+        cursor.execute("""
             SELECT timestamp, hashrate
             FROM hashrate_history
-            ORDER BY timestamp DESC
-            LIMIT 100
-        """)
+            WHERE timestamp >= NOW() - INTERVAL '%s hours'
+            ORDER BY timestamp ASC
+        """, (hours,))
         
-        history = [{'timestamp': row['timestamp'], 'hashrate': float(row['hashrate'])} 
-                  for row in cur.fetchall()]
-        
-        cur.close()
+        history = cursor.fetchall()
+        cursor.close()
         conn.close()
         
-        return {'history': history}
+        return {
+            'history': [{
+                'timestamp': record[0].isoformat(),
+                'hashrate': record[1]
+            } for record in history]
+        }
+        
     except Exception as e:
-        logger.error(f"获取算力历史失败: {str(e)}")
+        logger.error(f"获取算力历史数据失败: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-# 启动服务器
-if __name__ == "__main__":
+# 启动算力历史记录线程
+def record_hashrate_history():
+    while True:
+        try:
+            stratum_data = read_stratum_data()
+            if not stratum_data:
+                time.sleep(300)
+                continue
+                
+            total_hashrate = stratum_data.get('hashrate_15m', 0)
+            
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            
+            cursor.execute("""
+                INSERT INTO hashrate_history (timestamp, hashrate)
+                VALUES (NOW(), %s)
+            """, (total_hashrate,))
+            
+            conn.commit()
+            cursor.close()
+            conn.close()
+            
+            logger.info(f"记录算力历史数据: {total_hashrate/1000:.2f} KH/s")
+            
+        except Exception as e:
+            logger.error(f"记录算力历史数据失败: {str(e)}")
+            if 'conn' in locals():
+                conn.close()
+        
+        time.sleep(300)
+
+# 启动后台线程
+hashrate_thread = threading.Thread(target=record_hashrate_history, daemon=True)
+hashrate_thread.start()
+
+if __name__ == '__main__':
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=80) 
+    uvicorn.run(app, host="0.0.0.0", port=8080) 
