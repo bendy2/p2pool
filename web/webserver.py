@@ -195,8 +195,6 @@ def pool_status():
         
         # 获取在线矿工列表
         online_miners = []
-        miner_xmr_share = {}
-        miner_tari_share = {}
         miner_hashrates = {}  # 用于合并同一用户的算力
         
         for worker in stratum_data['workers']:
