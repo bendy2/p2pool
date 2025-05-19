@@ -25,7 +25,7 @@ def connect_to_db(db_config):
 def find_account_by_tari_address(connection, tari_address):
     try:
         cursor = connection.cursor()
-        query = "SELECT username, xmr_balance, tari_balance FROM ACCOUNT WHERE tari_address = %s"
+        query = "SELECT username, xmr_balance, tari_balance FROM ACCOUNT WHERE tari_wallet = %s"
         cursor.execute(query, (tari_address,))
         result = cursor.fetchone()
         cursor.close()
