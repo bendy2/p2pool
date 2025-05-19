@@ -1,6 +1,7 @@
 import json
 import psycopg2
 from psycopg2 import Error
+from datetime import datetime, timedelta
 
 def read_config():
     with open('config.json', 'r') as f:
@@ -21,18 +22,50 @@ def connect_to_db(db_config):
         print(f"Error connecting to PostgreSQL: {e}")
         return None
 
-def check_username(connection, username):
+def find_account_by_tari_address(connection, tari_address):
     try:
-        username ="%"+username
         cursor = connection.cursor()
-        query = "SELECT username FROM ACCOUNT WHERE username like %s"
-        cursor.execute(query, (username,))
+        query = "SELECT username, xmr_balance, tari_balance FROM ACCOUNT WHERE tari_address = %s"
+        cursor.execute(query, (tari_address,))
         result = cursor.fetchone()
         cursor.close()
         return result
     except Error as e:
-        print(f"Error checking username: {e}")
+        print(f"Error finding account: {e}")
         return None
+
+def add_reward(connection, username, amount, currency, block_height):
+    try:
+        cursor = connection.cursor()
+        created_at = datetime.now() - timedelta(days=2)
+        query = """
+            INSERT INTO rewards (username, amount, currency, block_height, shares, created_at)
+            VALUES (%s, %s, %s, %s, %s, %s)
+        """
+        cursor.execute(query, (username, amount, currency, block_height, 0, created_at))
+        connection.commit()
+        cursor.close()
+        return True
+    except Error as e:
+        print(f"Error adding reward: {e}")
+        return False
+
+def update_account_balance(connection, username, xmr_amount, tari_amount):
+    try:
+        cursor = connection.cursor()
+        query = """
+            UPDATE ACCOUNT 
+            SET xmr_balance = xmr_balance + %s,
+                tari_balance = tari_balance + %s
+            WHERE username = %s
+        """
+        cursor.execute(query, (xmr_amount, tari_amount, username))
+        connection.commit()
+        cursor.close()
+        return True
+    except Error as e:
+        print(f"Error updating balance: {e}")
+        return False
 
 def main():
     # Read database configuration
@@ -44,17 +77,35 @@ def main():
         return
     
     try:
-        # Read usernames from 1.txt
+        # Read data from 1.txt
         with open('1.txt', 'r') as f:
             for line in f:
-                username = line.strip()
-                if username:  # Skip empty lines
-                    result = check_username(connection, username)
-                    if result:                        
-                        # 打印每个字段的值
-                        print(f"{result[0]}")
+                parts = line.strip().split()
+                if len(parts) == 3:
+                    tari_address, xmr_amount, tari_amount = parts
+                    xmr_amount = float(xmr_amount)
+                    tari_amount = float(tari_amount)
+                    
+                    # Find account by TARI address
+                    account = find_account_by_tari_address(connection, tari_address)
+                    
+                    if account:
+                        username, current_xmr, current_tari = account
+                        print(f"找到用户: {username}")
+                        
+                        # Add rewards
+                        if add_reward(connection, username, xmr_amount, 'XMR', 1):
+                            print(f"已添加 XMR 奖励: {xmr_amount}")
+                        if add_reward(connection, username, tari_amount, 'TARI', 2):
+                            print(f"已添加 TARI 奖励: {tari_amount}")
+                        
+                        # Update account balance
+                        if update_account_balance(connection, username, xmr_amount, tari_amount):
+                            print(f"已更新账户余额")
+                            print(f"XMR余额: {current_xmr + xmr_amount}")
+                            print(f"TARI余额: {current_tari + tari_amount}")
                     else:
-                        print(f"notfound")
+                        print(f"未找到TARI地址对应的账户: {tari_address}")
     
     except FileNotFoundError:
         print("Error: 1.txt file not found")

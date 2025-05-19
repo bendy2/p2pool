@@ -307,7 +307,7 @@ def user_info(username):
             JOIN blocks b ON r.block_height = b.block_height
             WHERE r.username = %s 
             ORDER BY b.time DESC 
-            LIMIT 20
+            LIMIT 50
         """, (username,))
         rewards = []
         for row in cur.fetchall():
