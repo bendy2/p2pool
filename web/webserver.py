@@ -270,7 +270,7 @@ def user_info(username):
             FROM rewards 
             WHERE username = %s 
             AND type = 'tari'
-            AND time >= NOW() - INTERVAL '18 hours'
+            AND created_at >= NOW() - INTERVAL '18 hours'
         """, (username,))
         frozen_result = cur.fetchone()
         frozen_tari = float(frozen_result['frozen_tari']) if frozen_result else 0
