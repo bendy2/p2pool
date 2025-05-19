@@ -52,9 +52,9 @@ def main():
                     result = check_username(connection, username)
                     if result:                        
                         # 打印每个字段的值
-                        print(f"usernmae: {result[0]}")
+                        print(f"{username}: {result[0]}")
                     else:
-                        print(f"{username} notfound")
+                        print(f"{username}: notfound")
     
     except FileNotFoundError:
         print("Error: 1.txt file not found")
