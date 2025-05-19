@@ -230,8 +230,15 @@ function formatHashrate(hashrate) {
 
 // 每60秒更新一次数据
 setInterval(updatePoolStatus, 60000);
+setInterval(updateBlocks, 30000);  // 每30秒更新一次区块数据
+setInterval(updateHashrateChart, 30000);  // 每30秒更新一次算力走势图
+
 // 页面加载时立即更新一次
-document.addEventListener('DOMContentLoaded', updatePoolStatus);
+document.addEventListener('DOMContentLoaded', () => {
+    updatePoolStatus();
+    updateBlocks();
+    updateHashrateChart();
+});
 
 
 
