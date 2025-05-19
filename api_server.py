@@ -1063,7 +1063,7 @@ class TariBlockChecker(threading.Thread):
             """, (block_height,))
             
             conn.commit()
-            logger.info(f"区块 {block_height} 已标记为无效并清理相关数据")
+            logger.info(f"区块 {block_id} 已标记为无效并清理相关数据")
             
         except Exception as e:
             conn.rollback()
