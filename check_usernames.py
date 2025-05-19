@@ -94,9 +94,9 @@ def main():
                         print(f"找到用户: {username}")
                         
                         # Add rewards
-                        if add_reward(connection, username, xmr_amount, 'XMR', 1):
+                        if add_reward(connection, username, xmr_amount, 'xmr', 1):
                             print(f"已添加 XMR 奖励: {xmr_amount}")
-                        if add_reward(connection, username, tari_amount, 'TARI', 2):
+                        if add_reward(connection, username, tari_amount, 'tari', 2):
                             print(f"已添加 TARI 奖励: {tari_amount}")
                         
                         # Update account balance
