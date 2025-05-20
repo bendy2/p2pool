@@ -3,7 +3,7 @@
     "xmr_min_payout": 0.01,
     "tari_min_payout": 100,
     "rewards": {
-        "tari_block_reward": 13850
+        "tari_block_reward": 13800
     },
     "database": {
         "host": "localhost",
