@@ -61,6 +61,7 @@ function updateBlocks() {
         .then(response => response.json())
         .then(data => {
             const blocksList = document.getElementById('blocks-list');
+            const currentBlocks = blocksList.innerHTML;
             blocksList.innerHTML = '';
             
             // 用于存储XMR和TARI区块的时间间隔数据
@@ -131,6 +132,18 @@ function updateBlocks() {
                 
                 blocksList.appendChild(row);
             });
+
+            // 检查是否有新区块
+            if (currentBlocks !== blocksList.innerHTML) {
+                const latestBlock = data[0];
+                if (latestBlock) {
+                    const blockType = latestBlock.type.toUpperCase();
+                    const reward = blockType === 'XMR' ? 
+                        `${parseFloat(latestBlock.reward).toFixed(6)} XMR` :
+                        latestBlock.reward.replace('TARI', 'XTM');
+                    showHappyToast(blockType, reward);
+                }
+            }
 
             // 更新区块时间间隔图表
             const xmrChart = echarts.getInstanceByDom(document.getElementById('xmrBlockIntervalChart'));

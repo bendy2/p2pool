@@ -6,6 +6,34 @@
     <title>Tari-Cpu TPOOL分享池</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+    <!-- 添加 Toast 样式 -->
+    <style>
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+        }
+        .happy-toast {
+            background: linear-gradient(45deg, #ff9a9e 0%, #fad0c4 99%, #fad0c4 100%);
+            color: #fff;
+            border: none;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+        .happy-toast .toast-header {
+            background: transparent;
+            border-bottom: 1px solid rgba(255,255,255,0.2);
+            color: #fff;
+        }
+        .happy-toast .toast-body {
+            font-size: 1.1em;
+            padding: 15px;
+        }
+        .emoji {
+            font-size: 1.5em;
+            margin-right: 10px;
+        }
+    </style>
     <!-- Disqus 配置 -->
     <script>
         var disqus_config = function () {
@@ -375,6 +403,50 @@
         });
     }
 
+    // 添加显示开心通知的函数
+    function showHappyToast(blockType, reward) {
+        const toastContainer = document.querySelector('.toast-container') || (() => {
+            const container = document.createElement('div');
+            container.className = 'toast-container';
+            document.body.appendChild(container);
+            return container;
+        })();
+
+        const toast = document.createElement('div');
+        toast.className = 'toast happy-toast';
+        toast.setAttribute('role', 'alert');
+        toast.setAttribute('aria-live', 'assertive');
+        toast.setAttribute('aria-atomic', 'true');
+
+        const emoji = blockType === 'XMR' ? '🎉' : '🌟';
+        const message = blockType === 'XMR' ? 
+            `太棒了！我们挖到了新的XMR区块！奖励: ${reward}` :
+            `太棒了！我们挖到了新的TARI区块！奖励: ${reward}`;
+
+        toast.innerHTML = `
+            <div class="toast-header">
+                <span class="emoji">${emoji}</span>
+                <strong class="me-auto">好消息！</strong>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+            <div class="toast-body">
+                ${message}
+            </div>
+        `;
+
+        toastContainer.appendChild(toast);
+        const bsToast = new bootstrap.Toast(toast, {
+            autohide: true,
+            delay: 3000
+        });
+        bsToast.show();
+
+        // 3秒后移除toast元素
+        setTimeout(() => {
+            toast.remove();
+        }, 3000);
+    }
+
     // 更新区块统计图表
     function updateBlockStats() {
         const blocksList = document.getElementById('blocks-list');
@@ -582,15 +654,12 @@
     const tariBlockIntervalChart = initTariBlockIntervalChart();
 
     // 定期更新数据
-
     setInterval(updateBlockStats, 30000);  // 每30秒更新一次区块统计
+    setInterval(updateBlocks, 10000);      // 每10秒更新一次区块列表
 
     // 页面加载时立即更新一次
-
     updateBlockStats();
-
-
-
+    updateBlocks();
 
     // 监听窗口大小变化，调整图表大小
     window.addEventListener('resize', function() {
