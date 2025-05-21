@@ -491,7 +491,7 @@ class TariPayment:
                     exit()
                 
                 # 每笔交易后等待
-                time.sleep(5)
+                time.sleep(30)
                 
             logger.info("所有支付处理完成")
             
